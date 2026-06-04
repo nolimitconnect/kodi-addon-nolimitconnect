@@ -72,3 +72,4 @@ nav:
     - Architecture: developer-docs/architecture.md
     - Building: developer-docs/building.md
     - Dialogs: developer-docs/dialogs.md
+    - Implementation Progress: developer-docs/progress.md

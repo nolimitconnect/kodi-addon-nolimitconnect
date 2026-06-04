@@ -13,6 +13,7 @@ Welcome to the kodi-addon-nolimitconnect developer documentation. This section c
 - [Architecture](architecture.md) — engine integration, IToGui/IFromGui bridge, threading model
 - [Building](building.md) — prerequisites, CMake configuration, build targets
 - [Dialogs](dialogs.md) — Kodi dialog specifications for setup, permissions, and host join
+- [Implementation Progress](progress.md) — long-running milestone tracker and task status
 
 ---
 

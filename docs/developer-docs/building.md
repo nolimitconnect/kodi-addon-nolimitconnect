@@ -92,6 +92,21 @@ cmake -B build \
 | `ENABLE_CAM_SERVER` | ON | Build CamServer plugin |
 | `CMAKE_INSTALL_PREFIX` | `/usr` | Install prefix |
 
+### Kodi Source Auto-Detection
+
+If `KODI_SOURCE_DIR` is not passed explicitly, the add-on CMake will try these paths in order:
+
+1. `$KODI_SOURCE_DIR` environment variable
+2. `../kodi-source` relative to this repository
+3. `$HOME/kodi-source`
+4. `/home/$USER/kodi-source`
+
+Recommended explicit configure (most reliable):
+
+```bash
+cmake -B build -DKODI_SOURCE_DIR=/home/<user>/kodi-source
+```
+
 ---
 
 ## Step 5 — Build
