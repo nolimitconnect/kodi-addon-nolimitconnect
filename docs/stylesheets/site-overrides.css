@@ -1,0 +1,133 @@
+/* ============================================================
+   kodi-addon-nolimitconnect — site overrides
+   Blue theme matching Kodi's dark UI
+   ============================================================ */
+
+/* ── Primary accent override: Kodi blue ── */
+:root {
+  --md-primary-fg-color:        rgb(15, 45, 58);
+  --md-primary-fg-color--light: #42c5f0;
+  --md-primary-fg-color--dark:  rgb(15, 45, 58);
+  --md-accent-fg-color:         #4682ad;
+  --md-typeset-a-color:         #4682ad;
+}
+
+[data-md-color-scheme="slate"][data-md-color-primary="blue"] {
+  --md-primary-fg-color: rgb(15, 45, 58);
+  --md-default-bg-color--dark: rgb(15, 45, 58);
+  --md-accent-fg-color: #4682ad;
+  --md-typeset-a-color: #4682ad;
+}
+
+/* Keep docs links readable in dark scheme */
+[data-md-color-scheme="slate"] .md-typeset a,
+[data-md-color-scheme="slate"] .md-typeset a:hover,
+[data-md-color-scheme="slate"] .md-typeset a:focus {
+  color: #4682ad;
+}
+
+/* Improve left-nav active item contrast */
+[data-md-color-scheme="slate"] .md-nav--primary .md-nav__item--active > .md-nav__link,
+[data-md-color-scheme="slate"] .md-nav--primary .md-nav__link--active {
+  color: #4682ad;
+}
+
+/* Add Kodi icon after site title in header */
+.md-header__topic:first-child .md-ellipsis::after {
+  content: "";
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-left: 0.35em;
+  vertical-align: -0.12em;
+  background: url("../assets/kodi-icon.svg") center / contain no-repeat;
+}
+
+/* ── Plugin card grid ── */
+.plugin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.2rem;
+  margin: 1.5rem 0;
+}
+
+.plugin-card {
+  background: linear-gradient(135deg, rgba(23, 178, 231, 0.12), rgba(13, 138, 184, 0.08));
+  border: 1px solid rgba(23, 178, 231, 0.35);
+  border-radius: 10px;
+  padding: 1.2rem 1.4rem;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.plugin-card:hover {
+  border-color: rgba(66, 197, 240, 0.7);
+  box-shadow: 0 6px 24px rgba(23, 178, 231, 0.25);
+}
+
+.plugin-card h3 {
+  margin-top: 0;
+  color: var(--md-primary-fg-color--light);
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+.plugin-card .slot-badge {
+  display: inline-block;
+  background: rgba(23, 178, 231, 0.2);
+  color: var(--md-primary-fg-color--light);
+  border-radius: 4px;
+  padding: 0.1em 0.5em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.6rem;
+}
+
+/* ── Status / warning banners ── */
+.early-dev-warning {
+  border-left: 4px solid #f4b400;
+  background: rgba(244, 180, 0, 0.08);
+  padding: 0.8rem 1.2rem;
+  border-radius: 4px;
+  color: #f4b400;
+  font-size: 0.9rem;
+  margin: 1rem 0;
+}
+
+/* ── Feature table ── */
+.feature-table td:first-child {
+  font-weight: 600;
+  color: var(--md-primary-fg-color--light);
+  white-space: nowrap;
+}
+
+/* ── Hero banner on home page ── */
+.hero {
+  text-align: center;
+  padding: 2.5rem 1rem 1.5rem;
+}
+
+.hero img.nlc-hero {
+  width: 100px;
+  height: 100px;
+  margin-bottom: 1rem;
+  filter: drop-shadow(0 0 14px rgba(23, 178, 231, 0.5));
+}
+
+.hero h1 {
+  font-size: 2rem;
+  margin: 0.3rem 0 0.5rem;
+}
+
+.hero .tagline {
+  color: var(--md-default-fg-color--light);
+  font-size: 1.05rem;
+  max-width: 600px;
+  margin: 0 auto 1.5rem;
+}
+
+/* ── Code block adjustments ── */
+.highlight pre {
+  border-left: 3px solid var(--md-primary-fg-color);
+}

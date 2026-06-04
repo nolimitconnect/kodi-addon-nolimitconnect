@@ -1,0 +1,196 @@
+---
+title: Overview
+---
+
+# NoLimitConnect for Kodi — Overview
+
+## What Is This Add-on?
+
+**kodi-addon-nolimitconnect** is a Kodi binary add-on that brings the [NoLimitConnect (NLC)](https://nolimitconnect.org) peer-to-peer communication platform into the Kodi media center. Rather than running NLC as a separate desktop application, this add-on embeds NLC's C/C++ engine directly into Kodi so that users can text, voice-chat, video-call, transfer files, and share media — all inside the Kodi interface they already know.
+
+!!! info "Upstream project"
+    NoLimitConnect is an independent, user-hosted social platform built in C/C++ with Qt. The Kodi add-on replaces the Qt GUI layer with Kodi's native GUI while reusing the full NLC networking engine unchanged.
+
+---
+
+## Core Principles
+
+The add-on inherits all of NoLimitConnect's core values:
+
+| Principle | Meaning |
+|---|---|
+| **No registration** | Users choose a display name — no email, phone number, or account required |
+| **No ads** | Zero advertising, tracking, or data mining |
+| **User-controlled infrastructure** | Anyone can run a network host; `nolimitconnect.net` is the default but not mandatory |
+| **Privacy by design** | All communication is encrypted end-to-end; no central logging |
+| **Native performance** | Pure C/C++ engine with Opus audio, FFmpeg media, and OpenGL rendering |
+
+---
+
+## How It Works
+
+### 1. Sign-On Flow
+
+```
+Kodi starts add-on
+       │
+       ▼
+Is a display name configured?
+  ├─ No  → Prompt user via Kodi dialog → Save display name
+  └─ Yes → Use existing name
+       │
+       ▼
+Resolve nolimitconnect.net
+  (ConnectionTest host + Network host)
+       │
+       ▼
+Announce presence to NetworkHost directory
+       │
+       ▼
+Join HostRandomConnect on nolimitconnect.net
+       │
+       ▼
+Add-on is online — plugins are active
+```
+
+When the add-on starts it resolves two infrastructure services on `nolimitconnect.net`:
+
+- **ConnectionTestHost** — confirms the user's external IP address and whether their TCP listen port is reachable from the internet.
+- **NetworkHost** — the directory service that stores and serves the list of active user hosts. All user hosts (RandomConnect, Group, ChatRoom) announce themselves here.
+
+Once both services are resolved, the add-on announces the user and joins the Random Connect host. The user is now discoverable by other NLC peers.
+
+### 2. P2P vs. Relay Connections
+
+NLC uses a hybrid networking model:
+
+```
+Peer A ──────── direct TCP/UDP ──────── Peer B
+          (when both ports are open)
+
+Peer A ── relay ── NLC relay server ── relay ── Peer B
+          (when NAT or firewall blocks direct connection)
+```
+
+The engine automatically chooses the best path. Direct connections are always preferred for performance. Relay is used as a fallback — no manual configuration required.
+
+### 3. Plugin System
+
+NLC's functionality is organized into numbered plugin slots (0–47 are "announced" — visible to the network with permission levels). The Kodi add-on implements seven of these:
+
+| Slot | Plugin | Category |
+|---|---|---|
+| 8 | Messenger | Peer-to-peer |
+| 9 | PushToTalk | Peer-to-peer |
+| 10 | PersonFileXfer | Peer-to-peer |
+| 11 | CamServer | Peer server |
+| 12 | FileShareServer | Peer server |
+| 15 | VideoChat | Peer-to-peer |
+| 16 | VoicePhone | Peer-to-peer |
+
+Each plugin slot has a corresponding permission level. Users can control which peers can use each plugin on their node (Ignore / Guest / Friend / Admin).
+
+---
+
+## Architecture
+
+### NLC Engine vs. Kodi GUI
+
+The NLC engine (`libptopengine`) is a self-contained C++ library that handles all networking, media encoding/decoding, and plugin logic. In the original desktop app it communicates with the Qt GUI through two interfaces:
+
+- **`IToGui`** — engine → GUI callbacks (e.g., "session started", "message received", "connection status changed")
+- **`IFromGui`** — GUI → engine commands (e.g., "start plugin session", "send file", "accept offer")
+
+In this Kodi add-on those two interfaces are implemented using Kodi's native GUI APIs instead of Qt widgets.
+
+```
+┌─────────────────────────────────────────────────────┐
+│                   Kodi Process                      │
+│                                                     │
+│  ┌──────────────────────────────────────────────┐  │
+│  │           Kodi Add-on (this project)          │  │
+│  │                                               │  │
+│  │  ┌─────────────────┐   ┌──────────────────┐  │  │
+│  │  │  Kodi GUI Layer │   │  NLC Engine       │  │  │
+│  │  │  (windows,      │◄──│  (libptopengine)  │  │  │
+│  │  │   dialogs,      │──►│                  │  │  │
+│  │  │   controls)     │   │  Plugins 8–16    │  │  │
+│  │  └─────────────────┘   └──────────────────┘  │  │
+│  │                                               │  │
+│  │  IToGui / IFromGui bridge (C++ interfaces)    │  │
+│  └──────────────────────────────────────────────┘  │
+│                                                     │
+│  Kodi core APIs: GUI, audio, video, filesystem      │
+└─────────────────────────────────────────────────────┘
+```
+
+### Qt → Kodi GUI Migration
+
+The original NLC uses Qt's widget system for all UI. Key mapping between concepts:
+
+| NLC / Qt concept | Kodi equivalent |
+|---|---|
+| `QDialog` / applet window | `CGUIWindow` or `CGUIDialog` |
+| `QWidget` layout | XML skin layout with `<control>` elements |
+| Qt signals/slots | Kodi `CGUIMessage` / `OnMessage()` |
+| `QLabel`, `QTextEdit` | `CGUITextBox`, `CGUIEditControl` |
+| `QListView` | `CGUIListContainer` / `CGUIFocusPlane` |
+| Qt audio (`QAudioInput`) | Kodi `IAEStream` + platform audio capture |
+| Qt video (`QVideoWidget`) | Kodi `IVideoPlayer` render surface |
+| `QPushButton` | `CGUIButtonControl` |
+| Qt threading | Kodi `CThread` / `CJobManager` |
+
+### Media Pipeline
+
+Audio and video use the NLC engine's existing media stack:
+
+- **Audio:** 16 kHz mono PCM → Opus encode → P2P packet → Opus decode → 16 kHz PCM playback. AEC (WebRTC) and RNNoise suppression are applied on the capture path.
+- **Video (VideoChat / CamServer):** Camera frame → MJPEG or H.264 encode → P2P packet → decode → render in Kodi window.
+- **File streaming (FileShareServer):** Virtual file I/O layer presents remote files as a seekable byte stream; Kodi's media player reads through it as if it were a local file.
+
+---
+
+## Network Topology
+
+```
+                      nolimitconnect.net
+                   ┌──────────────────────┐
+                   │  NetworkHost (dir)   │
+                   │  RandomConnectHost   │
+                   │  ConnectionTestHost  │
+                   └──────────────────────┘
+                          │        │
+              ┌───────────┘        └───────────┐
+              │                                │
+        Kodi User A                      Kodi User B
+      (this add-on)                    (this add-on)
+              │                                │
+              └──── direct P2P (preferred) ────┘
+              └─── or relay via NLC relay ─────┘
+```
+
+The `nolimitconnect.net` server hosts the infrastructure services (directory + connectivity test) and a default Random Connect host. Once two peers discover each other through the directory, their ongoing communication is direct — the central server is no longer in the data path.
+
+---
+
+## Permissions
+
+NLC's four-level permission system is preserved in the add-on:
+
+| Level | What peers at this level can do |
+|---|---|
+| **Ignore** | Cannot contact you at all |
+| **Guest** | Default for unknown peers; limited plugin access |
+| **Friend** | Full access to enabled plugins |
+| **Admin** | Same as Friend; reserved for future elevated features |
+
+Per-plugin permission thresholds let users fine-tune exactly who can initiate a Messenger session, file transfer, video call, etc.
+
+---
+
+## Further Reading
+
+- [Plugin Reference](plugins/index.md) — all seven plugins in detail
+- [Architecture Deep-Dive](developer-docs/architecture.md) — engine internals, IToGui/IFromGui bridge design
+- [Building the Add-on](developer-docs/building.md) — build system setup and CMake options
+- [NoLimitConnect technical docs](https://nolimitconnect.org/technical/) — upstream plugin system, session flow, audio flow, and more

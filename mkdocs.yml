@@ -1,0 +1,74 @@
+extra:
+  announce:
+    type: warning
+    text: >
+      🚧 kodi-addon-nolimitconnect is under active development. Not yet published — early testers and developers only.
+
+site_name: NLC for KODI™
+site_url: https://nolimitconnect.github.io/kodi-addon-nolimitconnect
+site_description: NoLimitConnect Kodi binary add-on — decentralized communication and media sharing inside Kodi.
+site_author: NoLimitConnect Project
+
+theme:
+  name: material
+  logo: assets/nlc-icon.svg
+  favicon: assets/nlc-icon.svg
+  palette:
+    - scheme: slate
+      primary: blue
+      accent: light blue
+  features:
+    - navigation.instant
+    - navigation.instant.reload
+    - navigation.tabs
+    - navigation.top
+    - navigation.footer
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+    - content.action.view
+    - announce
+
+markdown_extensions:
+  - admonition
+  - footnotes
+  - toc:
+      permalink: true
+  - tables
+  - def_list
+  - attr_list
+  - md_in_html
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+
+extra_css:
+  - stylesheets/site-overrides.css
+
+nav:
+  - Home: index.md
+  - Overview: overview.md
+  - Plugins:
+    - plugins/index.md
+    - Messenger: plugins/messenger.md
+    - Push To Talk: plugins/push-to-talk.md
+    - Person File Xfer: plugins/person-file-xfer.md
+    - Cam Server: plugins/cam-server.md
+    - File Share Server: plugins/file-share-server.md
+    - Video Chat: plugins/video-chat.md
+    - Voice Phone: plugins/voice-phone.md
+  - Developer Docs:
+    - developer-docs/index.md
+    - Architecture: developer-docs/architecture.md
+    - Building: developer-docs/building.md
+    - Dialogs: developer-docs/dialogs.md
