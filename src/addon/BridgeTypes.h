@@ -9,6 +9,7 @@ namespace nlc::addon
 enum class ToGuiEventType
 {
   kNetworkStateChanged,
+  kPromptDisplayNameRequested,
   kPluginSessionStarted,
   kPluginSessionEnded,
   kIncomingOffer,
@@ -27,6 +28,7 @@ struct ToGuiEvent
 
 enum class FromGuiCommandType
 {
+  kProvideDisplayName,
   kStartPluginSession,
   kStopPluginSession,
   kSendTextMessage,

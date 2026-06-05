@@ -8,6 +8,11 @@
 #include "addon/ToGuiBridge.h"
 #include "core/SignOnFlow.h"
 
+namespace kodi::addon
+{
+class CSettingValue;
+}
+
 namespace nlc
 {
 
@@ -17,6 +22,8 @@ public:
   void Initialize();
   void Shutdown();
 
+  bool HandleSettingChanged(const std::string& settingName,
+                            const kodi::addon::CSettingValue& settingValue);
   bool DispatchGuiCommand(const addon::FromGuiCommand& command);
   std::optional<addon::ToGuiEvent> PollGuiEvent();
 
@@ -24,6 +31,7 @@ public:
 
 private:
   void WireBridgeHandlers();
+  void EmitDisplayNamePromptEvent(const std::string& reason);
   void EmitStatusEvent(const std::string& message);
 
   std::optional<std::string> LoadConfiguredDisplayName() const;

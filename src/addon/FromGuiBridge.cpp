@@ -26,6 +26,8 @@ const char* FromGuiBridge::ToString(FromGuiCommandType commandType)
 {
   switch (commandType)
   {
+    case FromGuiCommandType::kProvideDisplayName:
+      return "ProvideDisplayName";
     case FromGuiCommandType::kStartPluginSession:
       return "StartPluginSession";
     case FromGuiCommandType::kStopPluginSession:

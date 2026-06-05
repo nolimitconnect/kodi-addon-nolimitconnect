@@ -24,8 +24,8 @@ This page is the long-running execution tracker for the Kodi binary add-on imple
 |---|---|---|---|
 | M0 | Project scaffolding and docs baseline | In Progress | Documentation and architecture plan exist |
 | M1 | Buildable add-on skeleton (load/unload cleanly) | In Progress | Skeleton compiles; runtime load/unload in Kodi still pending |
-| M2 | Engine bridge integration (`IToGui`/`IFromGui`) | In Progress | Typed command/event scaffolding and dispatch/queue wiring landed |
-| M3 | Identity + network sign-on flow | Not Started | Prompt for username then join host |
+| M2 | Engine bridge integration (`IToGui`/`IFromGui`) | In Progress | Typed command/event scaffolding landed; entrypoint now drains and logs bridge events |
+| M3 | Identity + network sign-on flow | In Progress | Display name persisted, prompt-or-join path wired, and dev-stub fallback identity added |
 | M4 | Core dialogs and settings UX | Not Started | Network setup, permissions, join host |
 | M5 | Audio pipeline (capture/playback) | Not Started | Required for PushToTalk and VoicePhone |
 | M6 | Plugin delivery (8, 9, 10, 11, 12, 15, 16) | Not Started | Implement in dependency order |
@@ -49,11 +49,11 @@ This page is the long-running execution tracker for the Kodi binary add-on imple
 |---|---|---|---|
 | P0 | Confirm source paths in this environment and normalize to workspace paths | Completed | Copilot + User |
 | P0 | Create initial code skeleton under `src/addon`, `src/gui`, `src/audio`, `src/stream` | Completed | Copilot |
-| P0 | Define first-run username + auto-join flow state machine | Completed (stub) | Copilot |
+| P0 | Define first-run username + auto-join flow state machine | Completed (wired scaffold) | Copilot |
 | P1 | Specify event map for `IToGui` callbacks -> Kodi GUI messages | Completed (scaffold) | Copilot |
 | P1 | Specify command map for Kodi actions -> `IFromGui` commands | Completed (scaffold) | Copilot |
 | P1 | Add milestone checklists and acceptance criteria | Not Started | Copilot |
-| P1 | Wire Kodi settings/profile persistence for display name | Not Started | Copilot |
+| P1 | Wire Kodi settings/profile persistence for display name | Completed | Copilot |
 
 ## Decisions Log
 
@@ -72,6 +72,17 @@ This page is the long-running execution tracker for the Kodi binary add-on imple
 | Audio latency/echo complexity across VOIP plugins | Poor call quality | Land shared audio pipeline first; add test harness before plugin-level polish |
 | Video plugin scope (capture/render/motion/record) | Schedule overrun | Stage CamServer before VideoChat and keep recording optional at first |
 
+## Runtime Smoke Checklist
+
+- [ ] Fresh profile test: `display_name` empty -> add-on emits prompt request event and does not mark network online.
+- [ ] Identity submit test: GUI sends `kProvideDisplayName` command -> setting persists and join command is dispatched.
+- [ ] Returning user test: non-empty `display_name` at startup -> add-on dispatches join command automatically.
+- [ ] Settings edit test: changing `display_name` through settings updates sign-on flow and re-triggers join dispatch.
+- [ ] Event drain test: Kodi GUI loop polls and handles `kPromptDisplayNameRequested`, `kNetworkStateChanged`, and status events.
+
+Note: With `NLC_ENABLE_DEV_STUBS` enabled, fresh profile startup currently auto-generates a temporary fallback display name (`kodi-dev-xxxxx`) and dispatches join to allow end-to-end flow testing before dialog UX is complete.
+- [x] Event drain test: Kodi GUI loop polls and handles `kPromptDisplayNameRequested`, `kNetworkStateChanged`, and status events.
+
 ## Change Log
 
 - 2026-06-04: Created initial implementation tracker with milestones, plugin order, decisions, and active work queue.
@@ -79,3 +90,7 @@ This page is the long-running execution tracker for the Kodi binary add-on imple
 - 2026-06-04: Added KODI source path auto-detection (env + common defaults) to CMake and validated configure with and without explicit `-DKODI_SOURCE_DIR`.
 - 2026-06-04: Built `libkodi-addon-nolimitconnect.so` successfully in `build-autodetect` after aligning addon entrypoint with Kodi 21 API signatures.
 - 2026-06-04: Started M2 by adding typed bridge scaffolding (`BridgeTypes`, `FromGuiBridge`, `ToGuiBridge`) and wiring `NlcAddon` command dispatch and event queue flow.
+- 2026-06-04: Started M3 by adding `resources/settings.xml` with `display_name`, loading persisted display name during sign-on initialization, and handling runtime setting updates in the add-on entrypoint.
+- 2026-06-04: Wired first-run bootstrap behavior so initialization now emits `kPromptDisplayNameRequested` when identity is missing, supports `kProvideDisplayName` command handling, and auto-dispatches `kJoinDefaultNetwork` when identity is available.
+- 2026-06-04: Added minimal event-consumer loop in add-on entrypoint (`Create`/`SetSetting`) to drain `NlcAddon` events and log prompt/network/status transitions for runtime observability.
+- 2026-06-04: Added dev-stub fallback identity behavior in `NlcAddon::Initialize` so missing `display_name` auto-populates a temporary value and joins network when `NLC_ENABLE_DEV_STUBS` is enabled.

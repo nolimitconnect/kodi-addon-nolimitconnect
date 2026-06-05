@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<settings version="1">
+  <category id="general" label="General">
+    <setting id="display_name"
+             type="string"
+             label="Display Name"
+             default="" />
+  </category>
+</settings>

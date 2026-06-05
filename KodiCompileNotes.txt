@@ -1,0 +1,73 @@
+These are notes for how I compiled on Ubuntu 24.04 VM and may not suite your needs
+
+git clone https://github.com/nolimitconnect/kodi-addon-nolimitconnect.git
+
+# 1. Grab the Kodi 21 "Omega" source code directly from GitHub
+git clone -b Omega https://github.com/xbmc/xbmc.git kodi-source
+
+# 2. Install necessary compiler tools and libraries from default Ubuntu repositories
+sudo apt update
+sudo apt install git cmake build-essential libpugixml-dev scons libwayland-egl1-mesa \
+exiv2 libexiv2-dev ffmpeg libflatbuffers-dev nlohmann-json3-dev libtinyxml2-dev
+sudo apt install liblzo2-dev
+sudo apt install libpng-dev
+sudo apt install libgif-dev libjpeg-dev libfmt-dev libfribidi-dev \
+libfreetype6-dev libfontconfig1-dev libpcre3-dev libgnutls28-dev \
+libgl1-mesa-dev libegl1-mesa-dev libass-dev libcdio-dev libspdlog-dev \
+libsqlite3-dev libcurl4-gnutls-dev libssl-dev libdbus-1-dev libudev-dev \
+libxkbcommon-dev libwayland-dev wayland-protocols
+
+sudo apt install libxml2-dev libxslt1-dev
+sudo apt install libfstrcmp-dev
+sudo apt install rapidjson-dev
+sudo apt install libtag1-dev
+sudo apt install libtinyxml-dev
+sudo apt install libwayland-client++0v5 libwayland++-dev wayland-scanner++
+// when error occurs 
+E: Unable to locate package libwayland-client++0v5
+E: Unable to locate package libwayland++-dev
+
+sudo apt install libpugixml-dev pugixml-doc
+sudo make -C /home/nolimit/kodi-source/tools/depends/target/waylandpp PREFIX=/usr/local
+
+sudo apt install libmicrohttpd-dev libnfs-dev libpipewire-0.3-dev \
+libpulse-dev libsmbclient-dev libva-dev liblcms2-dev libcdio++-dev
+
+export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig:$PKG_CONFIG_PATH
+sudo apt install libdrm-dev
+sudo apt install swig
+
+sudo apt install libunistring-dev
+
+
+# 3. Configure, compile, and install locally
+cd kodi-source
+mkdir build 
+cd build
+
+
+cd /home/nolimit/build
+rm -rf CMakeCache.txt CMakeFiles/
+
+export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/share/pkgconfig:$PKG_CONFIG_PATH
+
+# Added CMAKE_EXE_LINKER_FLAGS to force link system Wayland dependencies
+cmake ../ \
+  -DCMAKE_INSTALL_PREFIX=/usr/local \
+  -DCORE_PLATFORM_NAME=wayland \
+  -DAPP_RENDER_SYSTEM=gl \
+  -DENABLE_INTERNAL_TINYXML2=ON \
+  -DENABLE_INTERNAL_FLATBUFFERS=ON \
+  -DENABLE_INTERNAL_FFMPEG=ON \
+  -DENABLE_TESTING=OFF \
+  -DCMAKE_EXE_LINKER_FLAGS="-lwayland-client -lwayland-cursor -lwayland-egl"
+
+
+make -j$(nproc)
+
+./kodi-wayland
+or
+sudo make install
+
+
+

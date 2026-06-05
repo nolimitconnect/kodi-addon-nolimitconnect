@@ -34,6 +34,8 @@ const char* ToGuiBridge::ToString(ToGuiEventType eventType)
   {
     case ToGuiEventType::kNetworkStateChanged:
       return "NetworkStateChanged";
+    case ToGuiEventType::kPromptDisplayNameRequested:
+      return "PromptDisplayNameRequested";
     case ToGuiEventType::kPluginSessionStarted:
       return "PluginSessionStarted";
     case ToGuiEventType::kPluginSessionEnded:
