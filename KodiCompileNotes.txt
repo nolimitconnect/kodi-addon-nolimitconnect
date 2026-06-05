@@ -71,3 +71,5 @@ sudo make install
 
 
 
+// log is at 
+~/.kodi/temp/kodi.log

@@ -5,9 +5,10 @@
        provider-name="NoLimitConnect Project">
   <requires>
     <import addon="xbmc.addon" version="21.0.0" />
+    <import addon="xbmc.python" version="3.0.0" />
   </requires>
 
-  <extension point="xbmc.service" library_linux="libkodi-addon-nolimitconnect.so" start="login" />
+  <extension point="xbmc.service" library="resources/lib/service.py" start="login" />
 
   <extension point="xbmc.addon.metadata">
     <summary lang="en_GB">NoLimitConnect binary add-on for Kodi</summary>

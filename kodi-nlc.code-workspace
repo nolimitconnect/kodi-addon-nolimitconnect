@@ -1,0 +1,15 @@
+{
+  "folders": [
+    {
+      "name": "kodi-addon-nolimitconnect",
+      "path": "."
+    },
+    {
+      "name": "kodi-source",
+      "path": "../kodi-source"
+    }
+  ],
+  "settings": {
+    "debug.onTaskErrors": "abort"
+  }
+}

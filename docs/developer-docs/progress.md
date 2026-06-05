@@ -8,7 +8,7 @@ This page is the long-running execution tracker for the Kodi binary add-on imple
 
 ## Current Snapshot
 
-- Date: 2026-06-04
+- Date: 2026-06-05
 - Overall phase: Foundation and integration planning
 - Build/runtime context:
   - Kodi source: `/home/brett/kodi-source` (user-provided)
@@ -23,7 +23,7 @@ This page is the long-running execution tracker for the Kodi binary add-on imple
 | ID | Milestone | Status | Notes |
 |---|---|---|---|
 | M0 | Project scaffolding and docs baseline | In Progress | Documentation and architecture plan exist |
-| M1 | Buildable add-on skeleton (load/unload cleanly) | In Progress | Skeleton compiles; runtime load/unload in Kodi still pending |
+| M1 | Buildable add-on skeleton (load/unload cleanly) | In Progress | Skeleton compiles; add-on is visible in Kodi service list; load/unload behavior validation still pending |
 | M2 | Engine bridge integration (`IToGui`/`IFromGui`) | In Progress | Typed command/event scaffolding landed; entrypoint now drains and logs bridge events |
 | M3 | Identity + network sign-on flow | In Progress | Display name persisted, prompt-or-join path wired, and dev-stub fallback identity added |
 | M4 | Core dialogs and settings UX | Not Started | Network setup, permissions, join host |
@@ -74,6 +74,9 @@ This page is the long-running execution tracker for the Kodi binary add-on imple
 
 ## Runtime Smoke Checklist
 
+- [x] Service discovery test: add-on appears in Kodi Services list after install.
+- [ ] Service startup log test: expect "NoLimitConnect addon service started" in Kodi log during startup.
+- [x] Service startup log test: Kodi service manager starts NLC python bootstrap and emits startup/status logs.
 - [ ] Fresh profile test: `display_name` empty -> add-on emits prompt request event and does not mark network online.
 - [ ] Identity submit test: GUI sends `kProvideDisplayName` command -> setting persists and join command is dispatched.
 - [ ] Returning user test: non-empty `display_name` at startup -> add-on dispatches join command automatically.
@@ -94,3 +97,12 @@ Note: With `NLC_ENABLE_DEV_STUBS` enabled, fresh profile startup currently auto-
 - 2026-06-04: Wired first-run bootstrap behavior so initialization now emits `kPromptDisplayNameRequested` when identity is missing, supports `kProvideDisplayName` command handling, and auto-dispatches `kJoinDefaultNetwork` when identity is available.
 - 2026-06-04: Added minimal event-consumer loop in add-on entrypoint (`Create`/`SetSetting`) to drain `NlcAddon` events and log prompt/network/status transitions for runtime observability.
 - 2026-06-04: Added dev-stub fallback identity behavior in `NlcAddon::Initialize` so missing `display_name` auto-populates a temporary value and joins network when `NLC_ENABLE_DEV_STUBS` is enabled.
+- 2026-06-05: Manual runtime verification in Kodi confirmed `service.binary.nolimitconnect` is visible under Services after build/install.
+- 2026-06-05: Kodi log confirms discovery/install of `service.binary.nolimitconnect v0.1.0`; however no NLC service startup marker was observed and a UI navigation attempt logged "Addon with id service.binary.nolimitconnect not found locally."
+- 2026-06-05: Updated `addon.xml` service extension to use `library="libkodi-addon-nolimitconnect.so"` (instead of `library_linux`) to align with Kodi service addon loader expectations; rebuilt and reinstalled.
+- 2026-06-05: Re-ran Kodi after manifest update; log still shows discovery/install of `service.binary.nolimitconnect` but no `NoLimitConnect addon service started` marker and no `CServiceAddonManager` startup for NLC.
+- 2026-06-05: Root-caused service startup behavior in Kodi source: `CServiceAddonManager` starts only `.py` services. Switched add-on service entry to `resources/lib/service.py` bootstrap and added `xbmc.python` requirement.
+- 2026-06-05: Fixed NoLimitConnect popup error (`TypeError: Invalid setting type`) by replacing `getSettingString` with compatibility-safe `getSetting`, adding exception guards, and confirming clean startup logs.
+- 2026-06-05: Verified runtime markers: `CServiceAddonManager: starting service.binary.nolimitconnect`, `NoLimitConnect addon service started (python bootstrap)`, and successful native library load probe.
+
+Note: Existing VS Code task `build-nlc-plugin` currently removes `resources/lib/service.py` during install. Use manual install command (without deleting service.py) until the task definition is updated.
