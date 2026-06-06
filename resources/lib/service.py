@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import ctypes
 import os
 import traceback
 
@@ -15,22 +14,6 @@ def log(message, level=xbmc.LOGINFO):
     xbmc.log(f"[{ADDON_ID}] {message}", level)
 
 
-def try_load_native_library():
-    addon_path = xbmcvfs.translatePath(ADDON.getAddonInfo("path"))
-    lib_name = "libkodi-addon-nolimitconnect.so"
-    lib_path = os.path.join(addon_path, lib_name)
-
-    if not os.path.exists(lib_path):
-        log(f"Native library missing: {lib_path}", xbmc.LOGWARNING)
-        return
-
-    try:
-        ctypes.CDLL(lib_path)
-        log(f"Native library load probe succeeded: {lib_path}")
-    except OSError as err:
-        log(f"Native library load probe failed: {err}", xbmc.LOGERROR)
-
-
 def run_service():
     monitor = xbmc.Monitor()
     try:
@@ -42,7 +25,12 @@ def run_service():
 
     log("NoLimitConnect addon service started (python bootstrap)")
     log(f"Configured display_name='{display_name}'")
-    try_load_native_library()
+    addon_path = xbmcvfs.translatePath(ADDON.getAddonInfo("path"))
+    lib_path = os.path.join(addon_path, "libkodi-addon-nolimitconnect.so")
+    if os.path.exists(lib_path):
+        log(f"Native library present: {lib_path}")
+    else:
+        log(f"Native library missing: {lib_path}", xbmc.LOGWARNING)
 
     while not monitor.abortRequested():
         if monitor.waitForAbort(10):

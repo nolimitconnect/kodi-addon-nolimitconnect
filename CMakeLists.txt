@@ -8,6 +8,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(NLC_ENABLE_DEV_STUBS "Enable development stubs for non-wired components" ON)
 
+set(NLC_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/libs" CACHE PATH
+  "Path to imported NoLimitConnect libs tree (contains GuiInterface, libptopengine, CoreLib, etc.)")
+
 set(NLC_KODI_SOURCE_CANDIDATES
   "$ENV{KODI_SOURCE_DIR}"
   "${CMAKE_CURRENT_SOURCE_DIR}/../kodi-source"
@@ -43,12 +46,26 @@ if(NOT KODI_DEVKIT_INCLUDE_DIR)
   message(FATAL_ERROR "Could not locate kodi/AddonBase.h under KODI_SOURCE_DIR='${KODI_SOURCE_DIR}'")
 endif()
 
+set(NLC_LIBS_INCLUDE_DIRS)
+if(EXISTS "${NLC_LIBS_DIR}")
+  list(APPEND NLC_LIBS_INCLUDE_DIRS
+    "${NLC_LIBS_DIR}"
+    "${NLC_LIBS_DIR}/GuiInterface"
+    "${NLC_LIBS_DIR}/CoreLib"
+    "${NLC_LIBS_DIR}/libptopengine"
+  )
+  message(STATUS "Using NLC libs from: ${NLC_LIBS_DIR}")
+else()
+  message(WARNING "NLC libs directory not found at '${NLC_LIBS_DIR}'. Configure with -DNLC_LIBS_DIR=/path/to/libs once copied.")
+endif()
+
 set(NLC_SOURCES
   src/addon/addon.cpp
   src/addon/FromGuiBridge.cpp
   src/addon/NlcAddon.cpp
   src/addon/ToGuiBridge.cpp
   src/core/SignOnFlow.cpp
+  src/gui/WindowMain.cpp
 )
 
 add_library(kodi-addon-nolimitconnect SHARED ${NLC_SOURCES})
@@ -57,6 +74,7 @@ target_include_directories(kodi-addon-nolimitconnect
   PRIVATE
     ${KODI_DEVKIT_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${NLC_LIBS_INCLUDE_DIRS}
 )
 
 target_compile_definitions(kodi-addon-nolimitconnect

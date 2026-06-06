@@ -28,13 +28,17 @@ struct ToGuiEvent
 
 enum class FromGuiCommandType
 {
+  kEnterNlcUi,
+  kExitNlcUi,
   kProvideDisplayName,
   kStartPluginSession,
   kStopPluginSession,
   kSendTextMessage,
   kAcceptOffer,
   kDeclineOffer,
-  kJoinDefaultNetwork
+  kJoinDefaultNetwork,
+  kLeaveRandomConnectHost,
+  kJoinRandomConnectHost
 };
 
 struct FromGuiCommand

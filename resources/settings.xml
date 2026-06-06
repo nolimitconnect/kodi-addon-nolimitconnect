@@ -1,9 +1,38 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <settings version="1">
-  <category id="general" label="General">
-    <setting id="display_name"
-             type="string"
-             label="Display Name"
-             default="" />
-  </category>
+  <section id="service.binary.nolimitconnect">
+    <category id="general" label="General">
+      <group id="1">
+        <setting id="display_name" type="string" label="Display Name" help="">
+          <level>0</level>
+          <default></default>
+          <control type="edit" format="string" />
+        </setting>
+
+        <setting id="last_random_connect_host" type="string" label="Last Random Connect Host" help="">
+          <level>0</level>
+          <default>nolimitconnect.net</default>
+          <control type="edit" format="string" />
+        </setting>
+
+        <setting id="debug_nlc_ui_active" type="boolean" label="Debug: Simulate NLC UI Active" help="">
+          <level>0</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
+
+        <setting id="debug_emit_test_message" type="boolean" label="Debug: Emit Test Message Event" help="">
+          <level>0</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
+
+        <setting id="debug_emit_test_offer" type="boolean" label="Debug: Emit Test Incoming Offer" help="">
+          <level>0</level>
+          <default>false</default>
+          <control type="toggle" />
+        </setting>
+      </group>
+    </category>
+  </section>
 </settings>

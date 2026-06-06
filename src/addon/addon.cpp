@@ -1,4 +1,5 @@
 #include <kodi/AddonBase.h>
+#include <kodi/General.h>
 
 #include "addon/NlcAddon.h"
 #include "addon/ToGuiBridge.h"
@@ -26,6 +27,20 @@ void DrainAndLogGuiEvents(nlc::NlcAddon& addon)
       kodi::Log(ADDON_LOG_INFO,
                 "Network state event received: %s",
                 event->payload.c_str());
+    }
+
+    if (addon.IsNlcUiActive())
+    {
+      continue;
+    }
+
+    if (event->type == nlc::addon::ToGuiEventType::kInstantMessageReceived)
+    {
+      kodi::QueueNotification(QUEUE_INFO, "NoLimitConnect", "New message received");
+    }
+    else if (event->type == nlc::addon::ToGuiEventType::kIncomingOffer)
+    {
+      kodi::QueueNotification(QUEUE_WARNING, "NoLimitConnect", "Incoming call or offer");
     }
   }
 }

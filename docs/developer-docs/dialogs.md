@@ -6,6 +6,14 @@ title: Dialogs
 
 This page defines core dialogs that should be implemented and documented for the Kodi add-on GUI layer.
 
+## Global UX Constraints
+
+- The add-on must not join NLC network until user enters NLC UI.
+- Join should be triggered by explicit UI-entry or connect action from NLC screens.
+- While user is outside NLC screens, inbound events should surface as Kodi global notifications (`CGUIDialogKaiToast`) without forced UI focus switch.
+- Users must be able to leave current random host and join a different one.
+- The most recently joined random host becomes the next default host.
+
 ---
 
 ## Dialog: Network Setup
@@ -26,7 +34,7 @@ Collect and validate the local node's network identity and bootstrap endpoints d
 | Network Host URL | text | Yes | Default: `nolimitconnect.net` |
 | Connection Test Host | text | Yes | Can default from Network Host config |
 | TCP Listen Port | integer | Yes | Validate range and availability |
-| Auto-connect on startup | boolean | No | If enabled, sign-on starts with add-on |
+| Preferred Random Host | text | Yes | Defaults to last joined random host |
 
 ### Actions
 | Action | Behavior |
@@ -35,6 +43,8 @@ Collect and validate the local node's network identity and bootstrap endpoints d
 | Save | Persists settings to addon profile and closes dialog |
 | Cancel | Closes without writing changes |
 | Reset Defaults | Restores `nolimitconnect.net` defaults |
+
+Note: Save does not auto-join network. Join occurs only when user activates connect flow in NLC UI.
 
 ### Engine/Bridge Integration
 - GUI -> engine via `IFromGui` wrapper:
@@ -116,6 +126,7 @@ Provide a direct workflow to join a specific host/session target rather than onl
 |---|---|
 | Resolve | Queries directory/host info before join |
 | Join | Initiates session join to selected host |
+| Leave Current Host | Leaves current random host session |
 | Cancel | Closes dialog |
 
 ### Engine/Bridge Integration
@@ -131,6 +142,7 @@ Provide a direct workflow to join a specific host/session target rather than onl
 - Host field is required for Resolve/Join.
 - Join is disabled until host resolves or direct join policy permits bypass.
 - Surface actionable error text for timeout, not-found, and permission-denied responses.
+- On successful join, persist host as `last_random_connect_host` for next login.
 
 ---
 

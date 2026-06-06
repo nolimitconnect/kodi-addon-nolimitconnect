@@ -32,7 +32,14 @@ The add-on inherits all of NoLimitConnect's core values:
 ### 1. Sign-On Flow
 
 ```
-Kodi starts add-on
+Kodi starts add-on service
+       │
+       ▼
+Load profile settings
+  (display name + last random host)
+       │
+       ▼
+Wait for user to open NLC UI
        │
        ▼
 Is a display name configured?
@@ -40,25 +47,19 @@ Is a display name configured?
   └─ Yes → Use existing name
        │
        ▼
-Resolve nolimitconnect.net
-  (ConnectionTest host + Network host)
+Join preferred random host
+  (last joined host, default: nolimitconnect.net)
        │
        ▼
-Announce presence to NetworkHost directory
-       │
-       ▼
-Join HostRandomConnect on nolimitconnect.net
-       │
-       ▼
-Add-on is online — plugins are active
+Add-on is online for that host
 ```
 
-When the add-on starts it resolves two infrastructure services on `nolimitconnect.net`:
+When the user enters NLC UI and triggers connect, the add-on resolves infrastructure services for the selected random-connect host:
 
 - **ConnectionTestHost** — confirms the user's external IP address and whether their TCP listen port is reachable from the internet.
 - **NetworkHost** — the directory service that stores and serves the list of active user hosts. All user hosts (RandomConnect, Group, ChatRoom) announce themselves here.
 
-Once both services are resolved, the add-on announces the user and joins the Random Connect host. The user is now discoverable by other NLC peers.
+On successful join, that host becomes the new default (`last_random_connect_host`) for subsequent logins. Users can leave and join a different random host; the most recently joined host is used next time.
 
 ### 2. P2P vs. Relay Connections
 
@@ -76,17 +77,19 @@ The engine automatically chooses the best path. Direct connections are always pr
 
 ### 3. Plugin System
 
-NLC's functionality is organized into numbered plugin slots (0–47 are "announced" — visible to the network with permission levels). The Kodi add-on implements seven of these:
+NLC's functionality is organized into numbered plugin slots (0–47 are "announced" — visible to the network with permission levels). The Kodi add-on must remain compatible with the full plugin set required by the NLC engine runtime. For initial rollout, the Kodi UI and workflow focus on the seven core slots below while other plugins remain present but disabled by default.
 
-| Slot | Plugin | Category |
+| Slot | Plugin | Category | Initial UI State |
 |---|---|---|
-| 8 | Messenger | Peer-to-peer |
-| 9 | PushToTalk | Peer-to-peer |
-| 10 | PersonFileXfer | Peer-to-peer |
-| 11 | CamServer | Peer server |
-| 12 | FileShareServer | Peer server |
-| 15 | VideoChat | Peer-to-peer |
-| 16 | VoicePhone | Peer-to-peer |
+| 8 | Messenger | Peer-to-peer | Enabled |
+| 9 | PushToTalk | Peer-to-peer | Enabled |
+| 10 | PersonFileXfer | Peer-to-peer | Enabled |
+| 11 | CamServer | Peer server | Enabled |
+| 12 | FileShareServer | Peer server | Enabled |
+| 15 | VideoChat | Peer-to-peer | Enabled |
+| 16 | VoicePhone | Peer-to-peer | Enabled |
+
+All non-MVP plugin slots are still built and initialized as required by the engine integration, but are set to disabled until their Kodi UX is implemented.
 
 Each plugin slot has a corresponding permission level. Users can control which peers can use each plugin on their node (Ignore / Guest / Friend / Admin).
 

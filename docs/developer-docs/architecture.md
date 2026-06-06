@@ -148,16 +148,29 @@ Kodi loads add-on (IAddonInstance::Create)
 NlcAddon::Initialize()
     ├── Create ToGuiBridge (IToGui implementation)
     ├── Create FromGuiBridge (IFromGui wrapper)
-    ├── Initialize libptopengine with engine settings
-    │       (user name, network host URLs, listen port)
-    ├── Start NLC engine (NetServicesMgr begins DNS + connect)
+    ├── Load profile settings (display name + last random host)
+    ├── Initialize engine context but stay offline
     └── Register nlcstream:// file protocol
 
-Engine resolves nolimitconnect.net
+User navigates to NLC add-on in Kodi
+    └── `WindowMain::Open()` dispatches `EnterNlcUi`
+
+EnterNlcUi command
+    ├── Validate display name (prompt if missing)
+    ├── Select preferred random host (last joined, default: nolimitconnect.net)
+    └── Dispatch join request
+
+Engine resolves selected host and joins RandomConnect
     └── toGuiNetworkState(eNetworkStateOnline) → update Kodi status indicator
 
-User navigates to NLC add-on in Kodi
-    └── CGUIWindowManager opens WindowMain
+If inbound events arrive while NLC UI is not active, add-on event draining emits lightweight Kodi global notifications:
+
+- Instant message → info toast (`QUEUE_INFO`)
+- Incoming offer/call → warning toast (`QUEUE_WARNING`)
+
+This keeps users informed without force-switching Kodi focus.
+
+Current scaffold includes debug settings-driven hooks to simulate UI entry/exit and emit test message events for runtime validation before full navigation wiring is complete.
 
 User performs action (e.g., accept call)
     └── GUI calls FromGuiBridge → engine accepts offer → session starts

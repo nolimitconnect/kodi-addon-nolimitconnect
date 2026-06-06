@@ -56,15 +56,15 @@ For a full Kodi build guide see the [Kodi wiki](https://kodi.wiki/view/HOW-TO:Co
 
 ---
 
-## Step 3 — Clone NoLimitConnect (engine library)
+## Step 3 — Provide NLC libs tree
 
-The add-on depends on `libptopengine` from the NLC repository:
+The add-on build expects an imported NoLimitConnect `libs` tree. Current default location in this repository is:
 
 ```bash
-git clone https://github.com/nolimitconnect/NoLimitConnect.git /path/to/NoLimitConnect
+/path/to/kodi-addon-nolimitconnect/src/libs
 ```
 
-The CMake build will look for the NLC source tree at the path specified by `-DNLC_SOURCE_DIR`.
+If your libs tree is elsewhere, point CMake to it with `-DNLC_LIBS_DIR=/path/to/libs`.
 
 ---
 
@@ -76,8 +76,7 @@ cd /path/to/kodi-addon-nolimitconnect
 cmake -B build \
   -DCMAKE_BUILD_TYPE=Release \
   -DKODI_SOURCE_DIR=/path/to/kodi-source \
-  -DKODI_BUILD_DIR=/path/to/kodi-source/build \
-  -DNLC_SOURCE_DIR=/path/to/NoLimitConnect
+  -DNLC_LIBS_DIR=/path/to/kodi-addon-nolimitconnect/src/libs
 ```
 
 ### CMake Options
@@ -85,12 +84,8 @@ cmake -B build \
 | Option | Default | Description |
 |---|---|---|
 | `KODI_SOURCE_DIR` | (required) | Path to the Kodi source tree |
-| `KODI_BUILD_DIR` | (required) | Path to the Kodi build directory |
-| `NLC_SOURCE_DIR` | (required) | Path to the NoLimitConnect source tree |
-| `NLC_NETWORK_HOST_URL` | `nolimitconnect.net` | Default network host URL |
-| `ENABLE_VIDEO_CHAT` | ON | Build VideoChat plugin |
-| `ENABLE_CAM_SERVER` | ON | Build CamServer plugin |
-| `CMAKE_INSTALL_PREFIX` | `/usr` | Install prefix |
+| `NLC_LIBS_DIR` | `src/libs` | Path to imported NoLimitConnect `libs` folder |
+| `NLC_ENABLE_DEV_STUBS` | `ON` | Enable startup/dev scaffolding behavior while UI flows are incomplete |
 
 ### Kodi Source Auto-Detection
 
@@ -153,8 +148,8 @@ cp -r resources/ ~/.kodi/addons/service.binary.nolimitconnect/
 cmake -B build-debug \
   -DCMAKE_BUILD_TYPE=Debug \
   -DKODI_SOURCE_DIR=/path/to/kodi-source \
-  -DKODI_BUILD_DIR=/path/to/kodi-source/build \
-  -DNLC_SOURCE_DIR=/path/to/NoLimitConnect
+  -DNLC_LIBS_DIR=/path/to/kodi-addon-nolimitconnect/src/libs \
+  -DNLC_ENABLE_DEV_STUBS=ON
 
 cmake --build build-debug -j$(nproc)
 ```
@@ -165,13 +160,28 @@ Debug builds include NLC engine logging. Log output goes to Kodi's log file (`~/
 
 ## Troubleshooting
 
+## Runtime Verification Hooks (Current Scaffold)
+
+Until full Kodi window navigation is wired, use debug settings to validate runtime behavior:
+
+1. Open add-on settings.
+2. Toggle `Debug: Simulate NLC UI Active` ON.
+3. Confirm logs show join activity only after this action.
+4. Toggle `Debug: Simulate NLC UI Active` OFF.
+5. Toggle `Debug: Emit Test Message Event` ON while UI is inactive.
+6. Confirm a Kodi global toast appears (`New message received`).
+7. Toggle `Debug: Emit Test Incoming Offer` ON while UI is inactive.
+8. Confirm a Kodi warning toast appears (`Incoming call or offer`).
+
+These hooks are temporary scaffolding to validate deferred login and out-of-plugin notifications.
+
 ### `KODI_SOURCE_DIR` not found
 
 Make sure you pass the correct absolute path and that the directory contains a `xbmc/` subfolder.
 
-### Missing `libptopengine`
+### Missing NLC libs include paths
 
-Ensure `NLC_SOURCE_DIR` points to a complete NoLimitConnect checkout. The CMake will attempt to build `libptopengine` as a subproject.
+Ensure `NLC_LIBS_DIR` points to a complete `libs` tree containing at least `GuiInterface`, `CoreLib`, and `libptopengine`.
 
 ### Audio not working
 

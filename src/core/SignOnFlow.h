@@ -10,6 +10,7 @@ enum class SignOnState
 {
   kUninitialized,
   kLoadProfile,
+  kAwaitUserActivation,
   kPromptDisplayName,
   kPersistDisplayName,
   kJoinRandomConnectHost,
@@ -20,7 +21,8 @@ enum class SignOnState
 struct SignOnSnapshot
 {
   SignOnState state{SignOnState::kUninitialized};
-  std::string networkHostUrl{"nolimitconnect.net"};
+  std::string preferredRandomConnectHost{"nolimitconnect.net"};
+  std::optional<std::string> activeRandomConnectHost;
   std::optional<std::string> displayName;
   std::string lastError;
 };
@@ -29,9 +31,13 @@ class SignOnFlow
 {
 public:
   void Reset();
-  void Begin(const std::optional<std::string>& configuredDisplayName);
+  void Begin(const std::optional<std::string>& configuredDisplayName,
+             const std::optional<std::string>& configuredLastRandomConnectHost);
   void ProvideDisplayName(const std::string& displayName);
-  void MarkJoinedNetwork();
+  void SetPreferredRandomConnectHost(const std::string& host);
+  void RequestNetworkJoinFromUiEntry();
+  void MarkJoinedNetwork(const std::string& joinedHost);
+  void MarkLeftRandomConnectHost();
   void MarkFailed(const std::string& error);
 
   bool NeedsDisplayNamePrompt() const;

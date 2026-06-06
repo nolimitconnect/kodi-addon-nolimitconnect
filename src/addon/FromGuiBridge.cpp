@@ -26,6 +26,10 @@ const char* FromGuiBridge::ToString(FromGuiCommandType commandType)
 {
   switch (commandType)
   {
+    case FromGuiCommandType::kEnterNlcUi:
+      return "EnterNlcUi";
+    case FromGuiCommandType::kExitNlcUi:
+      return "ExitNlcUi";
     case FromGuiCommandType::kProvideDisplayName:
       return "ProvideDisplayName";
     case FromGuiCommandType::kStartPluginSession:
@@ -40,6 +44,10 @@ const char* FromGuiBridge::ToString(FromGuiCommandType commandType)
       return "DeclineOffer";
     case FromGuiCommandType::kJoinDefaultNetwork:
       return "JoinDefaultNetwork";
+    case FromGuiCommandType::kLeaveRandomConnectHost:
+      return "LeaveRandomConnectHost";
+    case FromGuiCommandType::kJoinRandomConnectHost:
+      return "JoinRandomConnectHost";
   }
 
   return "Unknown";
