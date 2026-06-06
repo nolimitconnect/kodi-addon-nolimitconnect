@@ -57,3 +57,147 @@ msgstr "For testing only: emits a test incoming message event"
 msgctxt "#30015"
 msgid "For testing only: emits a test incoming offer/call event"
 msgstr "For testing only: emits a test incoming offer/call event"
+
+msgctxt "#30020"
+msgid "Messenger (MVP)"
+msgstr "Messenger (MVP)"
+
+msgctxt "#30021"
+msgid "Peer ID"
+msgstr "Peer ID"
+
+msgctxt "#30022"
+msgid "Outgoing Text"
+msgstr "Outgoing Text"
+
+msgctxt "#30023"
+msgid "Send Message Now"
+msgstr "Send Message Now"
+
+msgctxt "#30024"
+msgid "Show Last Message"
+msgstr "Show Last Message"
+
+msgctxt "#30025"
+msgid "Clear Message History"
+msgstr "Clear Message History"
+
+msgctxt "#30030"
+msgid "Settings-driven Messenger MVP scaffold"
+msgstr "Settings-driven Messenger MVP scaffold"
+
+msgctxt "#30031"
+msgid "Destination peer identifier for outgoing messages"
+msgstr "Destination peer identifier for outgoing messages"
+
+msgctxt "#30032"
+msgid "Text payload to send when trigger is toggled"
+msgstr "Text payload to send when trigger is toggled"
+
+msgctxt "#30033"
+msgid "Sends the current outgoing text to the configured peer"
+msgstr "Sends the current outgoing text to the configured peer"
+
+msgctxt "#30034"
+msgid "Displays the most recent locally stored message"
+msgstr "Displays the most recent locally stored message"
+
+msgctxt "#30035"
+msgid "Clears local Messenger MVP history file"
+msgstr "Clears local Messenger MVP history file"
+
+msgctxt "#30100"
+msgid "Identity"
+msgstr "Identity"
+
+msgctxt "#30101"
+msgid "User Name"
+msgstr "User Name"
+
+msgctxt "#30102"
+msgid "Mood Message"
+msgstr "Mood Message"
+
+msgctxt "#30110"
+msgid "Set the Kodi user name used for NLC startup."
+msgstr "Set the Kodi user name used for NLC startup."
+
+msgctxt "#30111"
+msgid "Enter 4 to 31 UTF-8 characters. The addon can prefill this from your Kodi profile."
+msgstr "Enter 4 to 31 UTF-8 characters. The addon can prefill this from your Kodi profile."
+
+msgctxt "#30112"
+msgid "Enter an optional mood/status message for startup."
+msgstr "Enter an optional mood/status message for startup."
+
+msgctxt "#30120"
+msgid "Network"
+msgstr "Network"
+
+msgctxt "#30121"
+msgid "Listen Port"
+msgstr "Listen Port"
+
+msgctxt "#30122"
+msgid "Network Host Url"
+msgstr "Network Host Url"
+
+msgctxt "#30123"
+msgid "Connection Test Url"
+msgstr "Connection Test Url"
+
+msgctxt "#30124"
+msgid "Connection Mode"
+msgstr "Connection Mode"
+
+msgctxt "#30125"
+msgid "Use Connection Test Service To Test Is Port Open"
+msgstr "Use Connection Test Service To Test Is Port Open"
+
+msgctxt "#30126"
+msgid "Assume Users Can Connect Directly (Port Is Always Open)"
+msgstr "Assume Users Can Connect Directly (Port Is Always Open)"
+
+msgctxt "#30127"
+msgid "External IP"
+msgstr "External IP"
+
+msgctxt "#30130"
+msgid "Configure network startup values for the NLC P2P engine."
+msgstr "Configure network startup values for the NLC P2P engine."
+
+msgctxt "#30131"
+msgid "Enter a TCP port. The addon will prefill a random free port on first run."
+msgstr "Enter a TCP port. The addon will prefill a random free port on first run."
+
+msgctxt "#30132"
+msgid "Enter the main NLC host service URL."
+msgstr "Enter the main NLC host service URL."
+
+msgctxt "#30133"
+msgid "Enter the connection test service URL."
+msgstr "Enter the connection test service URL."
+
+msgctxt "#30134"
+msgid "Choose how the addon should determine whether inbound connections are possible."
+msgstr "Choose how the addon should determine whether inbound connections are possible."
+
+msgctxt "#30135"
+msgid "Enter your external IP address when direct connections are assumed."
+msgstr "Enter your external IP address when direct connections are assumed."
+
+msgctxt "#30140"
+msgid "Startup"
+msgstr "Startup"
+
+msgctxt "#30141"
+msgid "Run Startup Configuration"
+msgstr "Run Startup Configuration"
+
+msgctxt "#30150"
+msgid "Print the current startup config for the NLC P2P engine."
+msgstr "Print the current startup config for the NLC P2P engine."
+
+msgctxt "#30151"
+msgid "Toggle this to validate and print the current configuration."
+msgstr "Toggle this to validate and print the current configuration."

@@ -27,7 +27,7 @@
 # define NLC_ARCH_LITTLE_ENDIAN			1
 
 # define ARCH_ARM                       0
-# define AARCH64                        0 // the other arm type android cpu
+# define ARCH_AARCH64                   0
 # define ARCH_X86						1
 
 #if defined(WIN64) || defined(__x86_64__) || defined(_WIN64)
@@ -136,8 +136,9 @@
 # define ARCH_32_BITS					0
 # define ARCH_64_BITS                   1
 
-# if defined(TARGET_CPU_ARM64)	
-#  define ARCH_AARCH64                  1
+# if defined(TARGET_CPU_ARM64) || defined(__aarch64__) || defined(_M_ARM64)
+#  define TARGET_CPU_ARM64            1
+#  define ARCH_AARCH64                1
 # else
 #  define TARGET_CPU_X64			    1  // general cpu type
 #  define ARCH_X86                      1
@@ -181,7 +182,8 @@ echo error ppc processors not supported
 echo error aarch64 processors not supported
 # define NLC_ARCH_LITTLE_ENDIAN				1
 # define NLC_ARCH_BIG_ENDIAN				0
-# define TARGET_CPU_AARCH					1
+# define TARGET_CPU_ARM64			1
+# define ARCH_AARCH64				1
 # define ARCH_64_BITS						1
 #else
 echo unknown processor types are not supported

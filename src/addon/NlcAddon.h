@@ -34,15 +34,28 @@ public:
 
 private:
   void WireBridgeHandlers();
+  void InitializeStorageAndEngine();
+  void UpdateEngineIdentityFromSettings();
+  void MaybeStartEngineUserLogon();
   void EmitDisplayNamePromptEvent(const std::string& reason);
   void EmitStatusEvent(const std::string& message);
 
   std::optional<std::string> LoadConfiguredDisplayName() const;
+  std::optional<std::string> LoadConfiguredMoodMessage() const;
   std::optional<std::string> LoadLastRandomConnectHost() const;
+
+  std::string BuildUserSpecificDir(const std::string& userName) const;
+  std::string BuildUserXferDir(const std::string& userName) const;
 
   core::SignOnFlow m_signOnFlow;
   addon::FromGuiBridge m_fromGuiBridge;
   addon::ToGuiBridge m_toGuiBridge;
+  bool m_engineStorageInitialized{false};
+  bool m_engineUserLoggedOn{false};
+  std::string m_assetsDir;
+  std::string m_rootDataDir;
+  std::string m_userSpecificDir;
+  std::string m_userXferDir;
   bool m_isNlcUiActive{false};
 };
 

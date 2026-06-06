@@ -81,6 +81,24 @@ Voice messages use the same Opus pipeline as [VoicePhone](voice-phone.md) and [P
 | Save history | Store session message history locally | Enabled |
 | Notification sound | Play audio notification on incoming message | Enabled |
 
+## Current MVP Scaffold (Implemented)
+
+The current runtime path uses Python service scaffolding so Messenger can be exercised before full Kodi window/dialog integration is complete.
+
+What currently works:
+
+- Settings-driven send trigger (`Send Message Now`)
+- Local history persistence (`messenger_history.jsonl` in add-on profile)
+- Simulated incoming reply (echo) for end-to-end UX testing
+- Show last message and clear history actions from settings
+- Global Kodi notifications for sent and received message events
+
+Current limitations:
+
+- No dedicated Messenger window/list yet
+- No real engine-backed peer transport yet (incoming is simulated echo)
+- No attachment, voice clip, or video snippet handling in this scaffold
+
 ---
 
 ## Related

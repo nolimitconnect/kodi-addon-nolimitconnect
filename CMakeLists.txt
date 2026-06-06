@@ -6,6 +6,40 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(NLC_PLATFORM_DEFINES)
+
+if(WIN32)
+  list(APPEND NLC_PLATFORM_DEFINES TARGET_OS_WINDOWS=1 TARGET_CPU_X64=1)
+else()
+  list(APPEND NLC_PLATFORM_DEFINES TARGET_POSIX=1)
+
+  if(ANDROID)
+    list(APPEND NLC_PLATFORM_DEFINES TARGET_OS_ANDROID=1)
+    if(CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
+      list(APPEND NLC_PLATFORM_DEFINES TARGET_CPU_ARM64=1)
+    elseif(CMAKE_ANDROID_ARCH_ABI STREQUAL "x86_64")
+      list(APPEND NLC_PLATFORM_DEFINES TARGET_CPU_X64=1)
+    else()
+      message(FATAL_ERROR "Unsupported Android ABI '${CMAKE_ANDROID_ARCH_ABI}'. Only arm64-v8a and x86_64 are supported.")
+    endif()
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND NLC_PLATFORM_DEFINES TARGET_OS_LINUX=1)
+    string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" NLC_SYSTEM_PROCESSOR_LOWER)
+    if(NLC_SYSTEM_PROCESSOR_LOWER MATCHES "^(aarch64|arm64)$")
+      list(APPEND NLC_PLATFORM_DEFINES TARGET_CPU_ARM64=1)
+    elseif(NLC_SYSTEM_PROCESSOR_LOWER MATCHES "^(x86_64|amd64|x64)$")
+      list(APPEND NLC_PLATFORM_DEFINES TARGET_CPU_X64=1)
+    else()
+      message(FATAL_ERROR "Unsupported CPU '${CMAKE_SYSTEM_PROCESSOR}'. Only x86_64 and aarch64 are supported.")
+    endif()
+  elseif(APPLE)
+    list(APPEND NLC_PLATFORM_DEFINES TARGET_OS_APPLE=1)
+    message(FATAL_ERROR "Apple platform is not supported by the vendored NLC libs in this build.")
+  else()
+    message(FATAL_ERROR "Unsupported platform '${CMAKE_SYSTEM_NAME}' for vendored NLC libs.")
+  endif()
+endif()
+
 option(NLC_ENABLE_DEV_STUBS "Enable development stubs for non-wired components" ON)
 
 set(NLC_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/libs" CACHE PATH
@@ -79,6 +113,7 @@ target_include_directories(kodi-addon-nolimitconnect
 
 target_compile_definitions(kodi-addon-nolimitconnect
   PRIVATE
+    ${NLC_PLATFORM_DEFINES}
     $<$<BOOL:${NLC_ENABLE_DEV_STUBS}>:NLC_ENABLE_DEV_STUBS=1>
 )
 

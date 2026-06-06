@@ -3,8 +3,21 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <filesystem>
 
 #include <kodi/AddonBase.h>
+
+#include <PktLib/PktAnnounce.h>
+#include <libptopengine/P2PEngine/P2PEngine.h>
+
+enum EAppDir : int
+{
+  eAppData = 1
+};
+void VxSetAppDirectory(EAppDir appDir, std::string setDir);
+void VxSetRootDataStorageDirectory(const char* rootDataDir);
+void VxSetRootUserDataDirectory(const char* rootUserDataDir);
+void VxSetRootXferDirectory(const char* rootXferDir);
 
 namespace nlc
 {
@@ -37,11 +50,36 @@ std::string GenerateDevStubDisplayName()
   return "kodi-dev-" + std::to_string(seconds % 100000);
 }
 
+std::string SanitizePathComponent(std::string value)
+{
+  for (char& ch : value)
+  {
+    const unsigned char ascii = static_cast<unsigned char>(ch);
+    if (!(std::isalnum(ascii) != 0 || ch == '-' || ch == '_' || ch == '.'))
+    {
+      ch = '_';
+    }
+  }
+
+  return value;
+}
+
+std::string EnsureTrailingSlash(std::string value)
+{
+  if (!value.empty() && value.back() != '/')
+  {
+    value.push_back('/');
+  }
+
+  return value;
+}
+
 } // namespace
 
 void NlcAddon::Initialize()
 {
   WireBridgeHandlers();
+  InitializeStorageAndEngine();
 
   m_signOnFlow.Reset();
   m_signOnFlow.Begin(LoadConfiguredDisplayName(), LoadLastRandomConnectHost());
@@ -125,6 +163,33 @@ bool NlcAddon::HandleSettingChanged(const std::string& settingName,
     return true;
   }
 
+  if (settingName == "user_name")
+  {
+    const std::string trimmedValue = TrimWhitespace(settingValue.GetString());
+    kodi::addon::SetSettingString("user_name", trimmedValue);
+    m_signOnFlow.ProvideDisplayName(trimmedValue);
+    UpdateEngineIdentityFromSettings();
+    MaybeStartEngineUserLogon();
+
+    if (m_signOnFlow.NeedsDisplayNamePrompt())
+    {
+      EmitDisplayNamePromptEvent(m_signOnFlow.GetSnapshot().lastError);
+      return true;
+    }
+
+    EmitStatusEvent("User name updated; startup storage is ready");
+    return true;
+  }
+
+  if (settingName == "mood_message")
+  {
+    const std::string trimmedValue = TrimWhitespace(settingValue.GetString());
+    kodi::addon::SetSettingString("mood_message", trimmedValue);
+    UpdateEngineIdentityFromSettings();
+    EmitStatusEvent("Mood message updated");
+    return true;
+  }
+
   if (settingName != "display_name")
   {
     return false;
@@ -134,6 +199,8 @@ bool NlcAddon::HandleSettingChanged(const std::string& settingName,
   kodi::addon::SetSettingString("display_name", trimmedValue);
 
   m_signOnFlow.ProvideDisplayName(trimmedValue);
+  UpdateEngineIdentityFromSettings();
+  MaybeStartEngineUserLogon();
 
   if (m_signOnFlow.NeedsDisplayNamePrompt())
   {
@@ -182,6 +249,7 @@ void NlcAddon::WireBridgeHandlers()
                                   [this](const addon::FromGuiCommand&) {
                                     m_isNlcUiActive = true;
                                     m_signOnFlow.RequestNetworkJoinFromUiEntry();
+                                    MaybeStartEngineUserLogon();
 
                                     if (m_signOnFlow.NeedsDisplayNamePrompt())
                                     {
@@ -206,6 +274,8 @@ void NlcAddon::WireBridgeHandlers()
                                     const std::string trimmedName = TrimWhitespace(command.payload);
                                     kodi::addon::SetSettingString("display_name", trimmedName);
                                     m_signOnFlow.ProvideDisplayName(trimmedName);
+                                    UpdateEngineIdentityFromSettings();
+                                    MaybeStartEngineUserLogon();
 
                                     if (m_signOnFlow.NeedsDisplayNamePrompt())
                                     {
@@ -318,6 +388,103 @@ void NlcAddon::WireBridgeHandlers()
                                   });
 }
 
+void NlcAddon::InitializeStorageAndEngine()
+{
+  if (m_engineStorageInitialized)
+  {
+    return;
+  }
+
+  m_assetsDir = std::filesystem::path(kodi::addon::GetAddonPath()).lexically_normal().generic_string();
+  m_rootDataDir = EnsureTrailingSlash(
+      std::filesystem::path(kodi::addon::GetUserPath()).lexically_normal().generic_string());
+
+  const std::string appDataDir = m_rootDataDir + "app/";
+  const std::string xferRootDir = m_rootDataDir + "xfer/";
+
+  std::filesystem::create_directories(appDataDir);
+  std::filesystem::create_directories(xferRootDir);
+
+  VxSetAppDirectory(eAppData, appDataDir);
+  VxSetRootDataStorageDirectory(appDataDir.c_str());
+  VxSetRootUserDataDirectory(appDataDir.c_str());
+  VxSetRootXferDirectory(xferRootDir.c_str());
+
+  GetPtoPEngine().fromGuiAppStartup(m_assetsDir, appDataDir, true);
+
+  m_userSpecificDir = BuildUserSpecificDir(LoadConfiguredDisplayName().value_or(""));
+  m_userXferDir = BuildUserXferDir(LoadConfiguredDisplayName().value_or(""));
+
+  if (!m_userSpecificDir.empty())
+  {
+    std::filesystem::create_directories(m_userSpecificDir);
+    GetPtoPEngine().fromGuiSetUserSpecificDir(m_userSpecificDir, true);
+  }
+
+  if (!m_userXferDir.empty())
+  {
+    std::filesystem::create_directories(m_userXferDir);
+    GetPtoPEngine().fromGuiSetUserXferDir(m_userXferDir, true);
+  }
+
+  m_engineStorageInitialized = true;
+  EmitStatusEvent("Engine storage directories initialized");
+}
+
+void NlcAddon::UpdateEngineIdentityFromSettings()
+{
+  const auto userName = LoadConfiguredDisplayName();
+  const auto moodMessage = LoadConfiguredMoodMessage();
+
+  if (userName.has_value())
+  {
+    GetPtoPEngine().fromGuiOnlineNameChanged(userName->c_str());
+  }
+
+  if (moodMessage.has_value())
+  {
+    GetPtoPEngine().fromGuiMoodMessageChanged(moodMessage->c_str());
+  }
+
+  if (userName.has_value())
+  {
+    m_userSpecificDir = BuildUserSpecificDir(*userName);
+    m_userXferDir = BuildUserXferDir(*userName);
+
+    if (!m_userSpecificDir.empty())
+    {
+      std::filesystem::create_directories(m_userSpecificDir);
+      GetPtoPEngine().fromGuiSetUserSpecificDir(m_userSpecificDir, true);
+    }
+
+    if (!m_userXferDir.empty())
+    {
+      std::filesystem::create_directories(m_userXferDir);
+      GetPtoPEngine().fromGuiSetUserXferDir(m_userXferDir, true);
+    }
+  }
+}
+
+void NlcAddon::MaybeStartEngineUserLogon()
+{
+  if (!m_engineStorageInitialized || m_engineUserLoggedOn)
+  {
+    return;
+  }
+
+  const auto userName = LoadConfiguredDisplayName();
+  if (!userName.has_value())
+  {
+    return;
+  }
+
+  UpdateEngineIdentityFromSettings();
+  PktAnnounce& myPktAnnounce = GetPtoPEngine().getMyPktAnnounce();
+  GetPtoPEngine().fromGuiUserLoggedOn(myPktAnnounce.getVxNetIdent(), true);
+  m_engineUserLoggedOn = true;
+  EmitStatusEvent("Engine user logon started");
+}
+
 void NlcAddon::EmitStatusEvent(const std::string& message)
 {
   m_toGuiBridge.PostEvent({addon::ToGuiEventType::kStatusMessage, std::nullopt, std::nullopt, message});
@@ -333,7 +500,7 @@ void NlcAddon::EmitDisplayNamePromptEvent(const std::string& reason)
 
 std::optional<std::string> NlcAddon::LoadConfiguredDisplayName() const
 {
-  const std::string displayName = TrimWhitespace(kodi::addon::GetSettingString("display_name"));
+  const std::string displayName = TrimWhitespace(kodi::addon::GetSettingString("user_name"));
   if (displayName.empty())
   {
     return std::nullopt;
@@ -342,15 +509,46 @@ std::optional<std::string> NlcAddon::LoadConfiguredDisplayName() const
   return displayName;
 }
 
+std::optional<std::string> NlcAddon::LoadConfiguredMoodMessage() const
+{
+  const std::string moodMessage = TrimWhitespace(kodi::addon::GetSettingString("mood_message"));
+  if (moodMessage.empty())
+  {
+    return std::nullopt;
+  }
+
+  return moodMessage;
+}
+
 std::optional<std::string> NlcAddon::LoadLastRandomConnectHost() const
 {
-  const std::string host = TrimWhitespace(kodi::addon::GetSettingString("last_random_connect_host"));
+  const std::string host = TrimWhitespace(kodi::addon::GetSettingString("network_host_url"));
   if (host.empty())
   {
     return std::nullopt;
   }
 
   return host;
+}
+
+std::string NlcAddon::BuildUserSpecificDir(const std::string& userName) const
+{
+  if (m_rootDataDir.empty() || userName.empty())
+  {
+    return {};
+  }
+
+  return m_rootDataDir + "app/users/" + SanitizePathComponent(userName) + "/";
+}
+
+std::string NlcAddon::BuildUserXferDir(const std::string& userName) const
+{
+  if (m_rootDataDir.empty() || userName.empty())
+  {
+    return {};
+  }
+
+  return m_rootDataDir + "xfer/" + SanitizePathComponent(userName) + "/";
 }
 
 } // namespace nlc
