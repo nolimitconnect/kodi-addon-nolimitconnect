@@ -1,0 +1,18 @@
+git clone https://github.com/abseil/abseil-cpp.git
+cd abseil-cpp
+
+git checkout 20240116.2
+
+rm -rf build
+mkdir build
+cd build
+
+cmake .. -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DBUILD_SHARED_LIBS=OFF \
+  -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+  -DABSL_ENABLE_INSTALL=OFF \
+  -DCMAKE_CXX_STANDARD=17
+
+ninja
+make -j$(nproc)

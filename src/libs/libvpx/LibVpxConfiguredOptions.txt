@@ -1,0 +1,32 @@
+libvpx was pulled from
+git clone -b v1.13.1 https://chromium.googlesource.com/webm/libvpx libvpx
+the reason a newer virsion is not used is because not all arm compilers implement vdot_u32 (a intrinsic)
+
+
+mkdir build
+cd build
+
+
+Linux x64
+../libvpx/configure --as=nasm --enable-vp8 --enable-vp9  --disable-examples --disable-tools --disable-docs --disable-unit-tests --disable-webm_io --disable-libyuv
+
+Linux arm64
+../libvpx/configure --target=arm64-linux-gcc --as=nasm --enable-vp8 --enable-vp9  --disable-examples --disable-tools --disable-docs --disable-unit-tests --disable-webm_io --disable-libyuv
+
+Windows x64
+../libvpx/configure --target=x86_64-win64-vs17 --as=nasm --enable-vp8 --enable-vp9  --disable-examples --disable-tools --disable-docs --disable-unit-tests --disable-webm_io --disable-libyuv
+
+Android arm64
+../libvpx/configure --prefix=/path/to/your/install/dir --target=arm64-android-gcc --as=nasm --enable-vp8 --enable-vp9  --disable-examples --disable-tools --disable-docs --disable-unit-tests --disable-webm_io --disable-libyuv
+
+Android arm32
+../libvpx/configure --target=armv7-android-gcc --as=nasm --enable-vp8 --enable-vp9  --disable-examples --disable-tools --disable-docs --disable-unit-tests --disable-webm_io --disable-libyuv
+
+arm32 failed to configure so configured manually
+
+// compile and record output to text file
+make | tee -a vpxbuild.txt
+
+mv vpx_config.c vpx_config_linux_x64.c
+cp vpx_config_linux_x64.c ~/nolimitapp/libs/libvpx
+
