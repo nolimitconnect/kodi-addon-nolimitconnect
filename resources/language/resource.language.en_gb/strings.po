@@ -1,0 +1,59 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: service.binary.nolimitconnect\n"
+"POT-Creation-Date: 2026-06-06 00:00+0000\n"
+"PO-Revision-Date: 2026-06-06 00:00+0000\n"
+"Last-Translator: NoLimitConnect Project\n"
+"Language-Team: English (United Kingdom)\n"
+"Language: en_GB\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgctxt "#30000"
+msgid "General"
+msgstr "General"
+
+msgctxt "#30001"
+msgid "Display Name"
+msgstr "Display Name"
+
+msgctxt "#30002"
+msgid "Last Random Connect Host"
+msgstr "Last Random Connect Host"
+
+msgctxt "#30003"
+msgid "Debug: Simulate NLC UI Active"
+msgstr "Debug: Simulate NLC UI Active"
+
+msgctxt "#30004"
+msgid "Debug: Emit Test Message Event"
+msgstr "Debug: Emit Test Message Event"
+
+msgctxt "#30005"
+msgid "Debug: Emit Test Incoming Offer"
+msgstr "Debug: Emit Test Incoming Offer"
+
+msgctxt "#30010"
+msgid "General add-on and debug settings"
+msgstr "General add-on and debug settings"
+
+msgctxt "#30011"
+msgid "Name announced to peers when joining"
+msgstr "Name announced to peers when joining"
+
+msgctxt "#30012"
+msgid "Default random host to join on NLC UI entry"
+msgstr "Default random host to join on NLC UI entry"
+
+msgctxt "#30013"
+msgid "For testing only: simulates entering/leaving NLC UI"
+msgstr "For testing only: simulates entering/leaving NLC UI"
+
+msgctxt "#30014"
+msgid "For testing only: emits a test incoming message event"
+msgstr "For testing only: emits a test incoming message event"
+
+msgctxt "#30015"
+msgid "For testing only: emits a test incoming offer/call event"
+msgstr "For testing only: emits a test incoming offer/call event"

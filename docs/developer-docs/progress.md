@@ -97,6 +97,9 @@ Note: With `NLC_ENABLE_DEV_STUBS` enabled, fresh profile startup currently auto-
 
 ## Change Log
 
+- 2026-06-06: Hardened Python debug toggle handling with multi-key setting lookups (`id`, `addon.id`, `general.id`) and switched to builtin `Notification(...)` for reliable toast display across skins.
+- 2026-06-06: Fixed disabled/blank Configure settings presentation by migrating labels/help to localized string IDs and adding `resources/language/resource.language.en_gb/strings.po`.
+- 2026-06-06: Moved debug trigger handling to Python service loop so `debug_nlc_ui_active`, `debug_emit_test_message`, and `debug_emit_test_offer` produce immediate visible notifications in current runtime mode.
 - 2026-06-06: Removed Python bootstrap `ctypes.CDLL` startup probe and replaced it with file-presence check to avoid startup popup risk from unintended binary remote-communication initialization.
 - 2026-06-06: Added settings-driven `debug_emit_test_offer` hook to simulate incoming offer/call events and validate warning toast behavior when NLC UI is inactive.
 - 2026-06-06: Added settings-driven debug hooks to simulate NLC UI enter/exit and emit a test inbound message event for validating deferred login and background notifications.
