@@ -1,0 +1,751 @@
+//============================================================================
+// Copyright (C) 2013 Brett R. Jones
+//
+// Code copyrighted by Brett R. Jones is under dual license similar to Ruby's license
+// See file COPYING and LEGAL in root of the No Limit Connect project
+//
+// bjones.engineer@gmail.com
+// https://nolimitconnect.com
+//============================================================================
+
+#include "VxConnectInfo.h"
+
+#include <CoreLib/Invite.h>
+#include <CoreLib/PktBlobEntry.h>
+#include <CoreLib/VxParse.h>
+#include <CoreLib/VxGlobals.h>
+#include <CoreLib/VxDebug.h>
+#include <CoreLib/VxSktUtil.h>
+
+#include <memory.h>
+
+namespace
+{
+    const unsigned int MIN_INTERVAL_CONNECT_REQUEST_MS				= (5 * 60000);
+}
+
+//============================================================================
+VxConnectBaseInfo::VxConnectBaseInfo( const VxConnectBaseInfo &rhs )
+    : P2PEngineVersion( rhs )
+    , MyOSVersion( rhs )
+    , VxRelayFlags( rhs )
+    , FriendMatch( rhs )
+    , VxSearchFlags( rhs )
+    , m_DirectConnectId( rhs.m_DirectConnectId )
+{
+}
+
+//============================================================================
+bool VxConnectBaseInfo::addToBlob( PktBlobEntry& blob )
+{
+    bool result = P2PEngineVersion::addToBlob( blob );
+    result &= MyOSVersion::addToBlob( blob );
+    result &= VxRelayFlags::addToBlob( blob );
+    result &= FriendMatch::addToBlob( blob );
+    result &= VxSearchFlags::addToBlob( blob );
+    result &= m_DirectConnectId.addToBlob( blob );
+    return result;
+}
+
+//============================================================================
+bool VxConnectBaseInfo::extractFromBlob( PktBlobEntry& blob )
+{
+    bool result = P2PEngineVersion::extractFromBlob( blob );
+    result &= MyOSVersion::extractFromBlob( blob );
+    result &= VxRelayFlags::extractFromBlob( blob );
+    result &= FriendMatch::extractFromBlob( blob );
+    result &= VxSearchFlags::extractFromBlob( blob );
+    result &= m_DirectConnectId.extractFromBlob( blob );
+    return result;
+}
+
+//============================================================================
+VxConnectBaseInfo& VxConnectBaseInfo::operator =( const VxConnectBaseInfo &rhs )
+{
+	if( this != &rhs )
+	{
+        *((P2PEngineVersion*)this) = *((P2PEngineVersion*)&rhs);
+        *((MyOSVersion*)this) = *((MyOSVersion*)&rhs);
+        *((VxRelayFlags*)this) = *((VxRelayFlags*)&rhs);
+        *((FriendMatch*)this) = *((FriendMatch*)&rhs);
+        *((VxSearchFlags*)this) = *((VxSearchFlags*)&rhs);
+        m_DirectConnectId = rhs.m_DirectConnectId;
+	}
+
+	return *this;
+}
+
+//============================================================================
+std::string VxConnectBaseInfo::getMyOnlineUrl( EHostType hostType, bool appendHostSuffix )
+{
+    std::string myUrl;
+    std::string strIP; 
+    EIpAddrType addrType;
+    bool validIp = m_DirectConnectId.getIpAddress( strIP, addrType );
+    if( validIp && eIpAddrTypeUnknown != addrType && VxMakePtopUrl( strIP, m_DirectConnectId.getPort(), myUrl ) )
+    {
+        myUrl += "/";
+        myUrl += getMyOnlineId().toOnlineIdString().c_str();
+        if( appendHostSuffix )
+        {
+            if( hostType != eHostTypeUnknown )
+            {
+                Invite::appendHostTypeSuffix( hostType, myUrl );
+            }
+            else if( !requiresRelay() )
+            {
+                Invite::appendHostTypeSuffix( eHostTypePeerUser, myUrl );
+            }
+            else
+            {
+                Invite::appendHostTypeSuffix( hostType, myUrl );
+            }
+        }
+    }
+    else
+    {
+        static int64_t lastLogTime = 0;
+        int64_t timeNow = GetTimeStampMs();
+        if( 10000 < timeNow - lastLogTime )
+        {
+            lastLogTime = timeNow;
+            LogMsg( LOG_VERBOSE, "  VxConnectBaseInfo::getMyOnlineUrl invalid ip" );
+        }
+    }
+
+    return myUrl;
+}
+
+//============================================================================
+void VxConnectBaseInfo::setMyOnlineId( VxGUID& onlineId )
+{ 
+	m_DirectConnectId.setVxGUID( onlineId );
+}
+
+//============================================================================
+VxGUID& VxConnectBaseInfo::getMyOnlineId()								
+{ 
+	return m_DirectConnectId; 
+}
+
+bool			VxConnectBaseInfo::getMyOnlineId( std::string& strRetId )		{ return m_DirectConnectId.toHexString( strRetId ); }
+
+void			VxConnectBaseInfo::setOnlinePort( uint16_t port )				{ m_DirectConnectId.setPort( port ); }		
+uint16_t		VxConnectBaseInfo::getOnlinePort( void )						{ return m_DirectConnectId.getPort(); }
+
+//============================================================================
+bool VxConnectBaseInfo::setOnlineIpAddress( std::string ipAddress )	
+{ 
+    return m_DirectConnectId.setIpAddress( ipAddress ); 
+}
+
+//============================================================================
+bool VxConnectBaseInfo::getOnlineIpAddress( std::string& strRetIp, EIpAddrType& retIpType )	
+{ 
+    return m_DirectConnectId.getIpAddress( strRetIp, retIpType );
+}
+
+//============================================================================
+InetAddress& VxConnectBaseInfo::getOnlineIpAddress( void )
+{
+	return m_DirectConnectId.m_OnlineIp;
+}
+
+//============================================================================
+bool VxConnectBaseInfo::setOnlineIpAddress( InetAddress& ipAddr )			
+{ 
+	if( ipAddr.isIPv4() )
+	{
+		m_DirectConnectId.m_OnlineIp = ipAddr;
+        m_DirectConnectId.setIpAddressType( eIpAddrTypeIpv4 );
+        return true;
+	}
+    else if( ipAddr.isIPv6() )
+    {
+        m_DirectConnectId.m_OnlineIp = ipAddr;
+        m_DirectConnectId.setIpAddressType( eIpAddrTypeIpv6 );
+        return true;
+    }
+    else
+	{
+        LogMsg( LOG_ERROR, "VxConnectBaseInfo::%s: invalid address ", __func__ );
+        return false;
+	}
+}
+
+//============================================================================
+void VxConnectBaseInfo::clearOnlineIpAddress( void )
+{
+    m_DirectConnectId.clearIpAddress();
+}
+
+//============================================================================
+void VxConnectBaseInfo::getOnlinePort( std::string& strRetPort )	
+{ 
+    strRetPort = std::to_string( m_DirectConnectId.getPort() );
+}
+
+//============================================================================
+// VxConnectIdent
+//============================================================================
+VxConnectIdent::VxConnectIdent()
+{
+	m_OnlineName[ 0 ] = 0;
+	m_OnlineDesc[ 0 ] = 0;
+}
+
+//============================================================================
+VxConnectIdent::VxConnectIdent( const VxConnectIdent& rhs )
+: VxConnectBaseInfo( rhs )
+, m_TimeLastContactMs( rhs.m_TimeLastContactMs )
+, m_PrimaryLanguage( rhs.m_PrimaryLanguage )
+, m_ContentType( rhs.m_ContentType )
+, m_u8Age( rhs.m_u8Age )
+, m_u8Gender( rhs.m_u8Gender )
+, m_IsRelayed( rhs.m_IsRelayed )
+, m_IdentRes2( rhs.m_IdentRes2 )
+, m_NetHostGuid( rhs.m_NetHostGuid )
+, m_ChatRoomHostGuid( rhs.m_ChatRoomHostGuid )
+, m_GroupHostGuid( rhs.m_GroupHostGuid )
+, m_RandomConnectGuid( rhs.m_RandomConnectGuid )
+, m_AvatarGuid( rhs.m_AvatarGuid )
+, m_AvatarModifiedTime( rhs.m_AvatarModifiedTime )
+, m_NetHostThumbGuid( rhs.m_NetHostThumbGuid )
+, m_NetHostThumbModifiedTime( rhs.m_NetHostThumbModifiedTime )
+, m_ChatRoomThumbGuid( rhs.m_ChatRoomThumbGuid )
+, m_ChatRoomThumbModifiedTime( rhs.m_ChatRoomThumbModifiedTime )
+, m_GroupThumbGuid( rhs.m_GroupThumbGuid )
+, m_GroupThumbModifiedTime( rhs.m_GroupThumbModifiedTime )
+, m_RandomConnectThumbGuid( rhs.m_RandomConnectThumbGuid )
+, m_RandomConnectThumbModifiedTime( rhs.m_RandomConnectThumbModifiedTime )
+{
+    SafeStrCopy( m_OnlineName, rhs.m_OnlineName, MAX_ONLINE_NAME_LEN );
+    SafeStrCopy( m_OnlineDesc, rhs.m_OnlineDesc, MAX_ONLINE_DESC_LEN );
+}
+
+//============================================================================
+bool VxConnectIdent::addToBlob( PktBlobEntry& blob )
+{
+    bool result = VxConnectBaseInfo::addToBlob( blob );
+    result &= blob.setValue( m_OnlineName, MAX_ONLINE_NAME_LEN );
+    result &= blob.setValue( m_OnlineDesc, MAX_ONLINE_DESC_LEN );
+    result &= blob.setValue( m_TimeLastContactMs );
+    result &= blob.setValue( m_PrimaryLanguage );
+    result &= blob.setValue( m_ContentType );
+    result &= blob.setValue( m_u8Age );
+    result &= blob.setValue( m_u8Gender );
+    result &= blob.setValue( m_IsRelayed );
+    result &= blob.setValue( m_IdentRes2 );
+
+    result &= blob.setValue( m_NetHostGuid );
+    result &= blob.setValue( m_ChatRoomHostGuid );
+    result &= blob.setValue( m_GroupHostGuid );
+    result &= blob.setValue( m_RandomConnectGuid );
+
+    result &= blob.setValue( m_AvatarGuid );
+    result &= blob.setValue( m_AvatarModifiedTime );
+
+    result &= blob.setValue( m_NetHostThumbGuid );
+    result &= blob.setValue( m_NetHostThumbModifiedTime );
+
+    result &= blob.setValue( m_ChatRoomThumbGuid );
+    result &= blob.setValue( m_ChatRoomThumbModifiedTime );
+
+    result &= blob.setValue( m_GroupThumbGuid );
+    result &= blob.setValue( m_GroupThumbModifiedTime );
+
+    result &= blob.setValue( m_RandomConnectThumbGuid );
+    result &= blob.setValue( m_RandomConnectThumbModifiedTime );
+
+    return result;
+}
+
+//============================================================================
+bool VxConnectIdent::extractFromBlob( PktBlobEntry& blob )
+{
+    bool result = VxConnectBaseInfo::extractFromBlob( blob );
+    int onlineNameLen = MAX_ONLINE_NAME_LEN;
+    result &= blob.getValue( m_OnlineName, onlineNameLen );
+    int onlineDescLen = MAX_ONLINE_DESC_LEN;
+    result &= blob.getValue( m_OnlineDesc, onlineDescLen );
+    result &= blob.getValue( m_TimeLastContactMs );
+    result &= blob.getValue( m_PrimaryLanguage );
+    result &= blob.getValue( m_ContentType );
+    result &= blob.getValue( m_u8Age );
+    result &= blob.getValue( m_u8Gender );
+    result &= blob.getValue( m_IsRelayed );
+    result &= blob.getValue( m_IdentRes2 );
+
+    result &= blob.getValue( m_NetHostGuid );
+    result &= blob.getValue( m_ChatRoomHostGuid );
+    result &= blob.getValue( m_GroupHostGuid );
+    result &= blob.getValue( m_RandomConnectGuid );
+
+    result &= blob.getValue( m_AvatarGuid );
+    result &= blob.getValue( m_AvatarModifiedTime );
+
+    result &= blob.getValue( m_NetHostThumbGuid );
+    result &= blob.getValue( m_NetHostThumbModifiedTime );
+
+    result &= blob.getValue( m_ChatRoomThumbGuid );
+    result &= blob.getValue( m_ChatRoomThumbModifiedTime );
+
+    result &= blob.getValue( m_GroupThumbGuid );
+    result &= blob.getValue( m_GroupThumbModifiedTime );
+
+    result &= blob.getValue( m_RandomConnectThumbGuid );
+    result &= blob.getValue( m_RandomConnectThumbModifiedTime );
+    return result;
+}
+
+//============================================================================
+VxConnectIdent& VxConnectIdent::operator =( const VxConnectIdent& rhs )
+{
+    if( this != &rhs )
+    {
+        *((VxConnectBaseInfo*)this) = *((VxConnectBaseInfo*)&rhs);
+        SafeStrCopy( m_OnlineName, rhs.m_OnlineName, MAX_ONLINE_NAME_LEN );
+        SafeStrCopy( m_OnlineDesc, rhs.m_OnlineDesc, MAX_ONLINE_DESC_LEN );
+
+        m_TimeLastContactMs = rhs.m_TimeLastContactMs;
+        m_PrimaryLanguage = rhs.m_PrimaryLanguage;
+        m_ContentType = rhs.m_ContentType;
+        m_u8Age = rhs.m_u8Age;
+        m_u8Gender = rhs.m_u8Gender;
+        m_IsRelayed = rhs.m_IsRelayed;
+        m_IdentRes2 = rhs.m_IdentRes2;
+
+        m_NetHostGuid = rhs.m_NetHostGuid;
+        m_ChatRoomHostGuid = rhs.m_ChatRoomHostGuid;
+        m_GroupHostGuid = rhs.m_GroupHostGuid;
+        m_RandomConnectGuid = rhs.m_RandomConnectGuid;
+
+        m_AvatarGuid = rhs.m_AvatarGuid;
+        m_AvatarModifiedTime = rhs.m_AvatarModifiedTime;
+
+        m_NetHostThumbGuid = rhs.m_NetHostThumbGuid;
+        m_NetHostThumbModifiedTime = rhs.m_NetHostThumbModifiedTime;
+
+        m_ChatRoomThumbGuid = rhs.m_ChatRoomThumbGuid;
+        m_ChatRoomThumbModifiedTime = rhs.m_ChatRoomThumbModifiedTime;
+
+        m_GroupThumbGuid = rhs.m_GroupThumbGuid;
+        m_GroupThumbModifiedTime = rhs.m_GroupThumbModifiedTime;
+
+        m_RandomConnectThumbGuid = rhs.m_RandomConnectThumbGuid;
+        m_RandomConnectThumbModifiedTime = rhs.m_RandomConnectThumbModifiedTime;
+    }
+
+    return *this;
+}
+
+//============================================================================
+void VxConnectIdent::setOnlineName( const char* pUserName )			
+{ 
+    if( !pUserName )
+    {
+        m_OnlineName[0] = 0;
+    }
+    else
+    {
+        SafeStrCopy( m_OnlineName, pUserName, sizeof( m_OnlineName ));
+    }
+}
+
+//============================================================================
+//! set users online description
+void VxConnectIdent::setOnlineDescription( const char* pUserDesc )	
+{ 
+    if( !pUserDesc )
+    {
+        m_OnlineName[0] = 0;
+    }
+    else
+    {
+        SafeStrCopy( m_OnlineDesc, pUserDesc, sizeof( m_OnlineDesc ) );
+    }
+}
+
+//============================================================================
+bool VxConnectIdent::getThumbnailIdList( std::vector<VxGUID>& thumbIdList )
+{
+    thumbIdList.clear();
+    if( getAvatarThumbGuid().isValid() )
+    {
+        thumbIdList.push_back( getAvatarThumbGuid() );
+    }
+
+    if( getNetHostThumbGuid().isValid() )
+    {
+        thumbIdList.push_back( getNetHostThumbGuid() );
+    }
+
+    if( getChatRoomThumbGuid().isValid() )
+    {
+        thumbIdList.push_back( getChatRoomThumbGuid() );
+    }
+
+    if( getGroupThumbGuid().isValid() )
+    {
+        thumbIdList.push_back( getGroupThumbGuid() );
+    }
+
+    if( getGroupThumbGuid().isValid() )
+    {
+        thumbIdList.push_back( getGroupThumbGuid() );
+    }
+
+    return !thumbIdList.empty();
+}
+
+//============================================================================
+bool VxConnectIdent::getThumbnailPairList( std::vector<std::pair<VxGUID, int64_t>>& thumbPairList )
+{
+    thumbPairList.clear();
+    if( isAvatarValid() )
+    {
+        thumbPairList.push_back( std::make_pair( getAvatarThumbGuid(), getAvatarThumbModifiedTime() ) );
+    }
+
+    if( isNetHostThumbValid() )
+    {
+        thumbPairList.push_back( std::make_pair( getNetHostThumbGuid(), getNetHostThumbModifiedTime() ) );
+    }
+
+    if( isChatRoomThumbValid() )
+    {
+        thumbPairList.push_back( std::make_pair( getChatRoomHostGuid(), getChatRoomThumbModifiedTime() ) );
+    }
+
+    if( isGroupThumbValid() )
+    {
+        thumbPairList.push_back( std::make_pair( getGroupHostGuid(), getGroupThumbModifiedTime() ) );
+    }
+
+    if( isRandomConnectThumbValid() )
+    {
+        thumbPairList.push_back( std::make_pair( getRandomConnectGuid(), getRandomdConnectThumbModifiedTime() ) );
+    }
+
+    return !thumbPairList.empty();
+}
+
+//============================================================================
+bool VxConnectIdent::hasThumbId( EHostType hostType )
+{
+    switch( hostType )
+    {
+    case eHostTypeChatRoom:
+        return m_ChatRoomThumbGuid.isValid();
+    case eHostTypeGroup:
+        return m_GroupThumbGuid.isValid();
+    case eHostTypeNetwork:
+        return m_NetHostThumbGuid.isValid();
+    case eHostTypeRandomConnect:
+        return m_RandomConnectThumbGuid.isValid();
+    case eHostTypePeerUser:
+        return m_AvatarGuid.isValid();
+    default:
+        return false;
+    }
+}
+
+//============================================================================
+VxGUID& VxConnectIdent::getThumbId( EHostType hostType )
+{
+    static VxGUID nullGuid;
+    switch( hostType )
+    {
+    case eHostTypeChatRoom:
+        return m_ChatRoomThumbGuid;
+    case eHostTypeGroup:
+        return m_GroupThumbGuid;
+    case eHostTypeNetwork:
+        return m_NetHostThumbGuid;
+    case eHostTypeRandomConnect:
+        return m_RandomConnectThumbGuid;
+
+    case eHostTypePeerUser:
+        return m_AvatarGuid;
+    default:
+        return nullGuid;
+    }
+}
+
+//============================================================================
+VxGUID VxConnectIdent::getHostThumbId( EHostType hostType, bool defaultToAvatarThumbId )
+{
+    VxGUID thumbId;
+    switch( hostType )
+    {
+    case eHostTypeGroup:
+        if( isGroupThumbValid() ) { thumbId = getGroupThumbGuid(); }
+        break;
+
+    case eHostTypeChatRoom:
+        if( isChatRoomThumbValid() ) { thumbId = getChatRoomThumbGuid(); }
+        break;
+
+    case eHostTypeRandomConnect:
+        if( isRandomConnectThumbValid() ) { thumbId = getRandomConnectThumbGuid(); }
+        break;
+
+    case eHostTypeNetwork:
+        if( isNetHostThumbValid() ) { thumbId = getNetHostThumbGuid(); }
+        break;
+
+    default:
+        break;
+    }
+
+    if( defaultToAvatarThumbId && !thumbId.isValid() )
+    {
+        thumbId = getAvatarThumbGuid();
+    }
+
+    return thumbId;
+}
+
+//============================================================================
+void VxConnectIdent::setHostOrThumbModifiedTime( EHostType hostType, int64_t& timeModified )
+{
+    switch( hostType )
+    {
+    case eHostTypeChatRoom:
+        setModifiedTime( m_ChatRoomThumbModifiedTime, timeModified );
+        break;
+    case eHostTypeGroup:
+        setModifiedTime( m_GroupThumbModifiedTime, timeModified );
+        break;
+    case eHostTypeNetwork:
+        setModifiedTime( m_NetHostThumbModifiedTime, timeModified );
+        break;
+    case eHostTypeRandomConnect:
+        setModifiedTime( m_RandomConnectThumbModifiedTime, timeModified );
+        break;
+
+    case eHostTypePeerUser:
+        setModifiedTime( m_AvatarModifiedTime, timeModified );
+        break;
+    default:
+        break;
+    }
+}
+
+//============================================================================
+int64_t VxConnectIdent::getHostOrThumbModifiedTime( EHostType hostType )
+{
+    switch( hostType )
+    {
+    case eHostTypeChatRoom:
+        return m_ChatRoomThumbModifiedTime;
+    case eHostTypeGroup:
+        return m_GroupThumbModifiedTime;
+    case eHostTypeNetwork:
+        return m_NetHostThumbModifiedTime;
+    case eHostTypeRandomConnect:
+        return m_RandomConnectThumbModifiedTime;
+
+    case eHostTypePeerUser:
+        return m_AvatarModifiedTime;
+    default:
+        return 0;
+    }
+}
+
+//============================================================================
+bool VxConnectIdent::hasThumbId( EPluginType pluginType )
+{
+    switch( pluginType )
+    {
+    case ePluginTypeClientChatRoom:
+    case ePluginTypeHostChatRoom:
+        return m_ChatRoomThumbGuid.isValid();
+    case ePluginTypeClientGroup:
+    case ePluginTypeHostGroup:
+        return m_GroupThumbGuid.isValid();
+    case ePluginTypeClientNetwork:
+    case ePluginTypeHostNetwork:
+        return m_NetHostThumbGuid.isValid();
+    case ePluginTypeClientRandomConnect:
+    case ePluginTypeHostRandomConnect:
+        return m_RandomConnectThumbGuid.isValid();
+    case ePluginTypeClientPeerUser:
+    case ePluginTypeHostPeerUser:
+    case ePluginTypeInvalid:
+        return m_AvatarGuid.isValid();
+    default:
+        return false;
+    }
+}
+
+//============================================================================
+VxGUID& VxConnectIdent::getThumbId( EPluginType pluginType  )
+{
+    static VxGUID nullGuid;
+    switch( pluginType )
+    {
+    case ePluginTypeClientChatRoom:
+    case ePluginTypeHostChatRoom:
+        return m_ChatRoomThumbGuid;
+    case ePluginTypeClientGroup:
+    case ePluginTypeHostGroup:
+        return m_GroupThumbGuid;
+    case ePluginTypeClientNetwork:
+    case ePluginTypeHostNetwork:
+        return m_NetHostThumbGuid;
+    case ePluginTypeClientRandomConnect:
+    case ePluginTypeHostRandomConnect:
+        return m_RandomConnectThumbGuid;
+    case ePluginTypeClientPeerUser:
+    case ePluginTypeHostPeerUser:
+    case ePluginTypeInvalid:
+        return m_AvatarGuid;
+    default:
+        return nullGuid;
+    }
+}
+
+//============================================================================
+void VxConnectIdent::setHostOrThumbModifiedTime( EPluginType pluginType, int64_t& timeModified )
+{
+    switch( pluginType )
+    {
+    case ePluginTypeHostChatRoom:
+        setModifiedTime( m_ChatRoomThumbModifiedTime, timeModified );
+        break;
+    case ePluginTypeHostGroup:
+        setModifiedTime( m_GroupThumbModifiedTime, timeModified );
+        break;
+    case ePluginTypeHostNetwork:
+        setModifiedTime( m_NetHostThumbModifiedTime, timeModified );
+        break;
+    case ePluginTypeHostRandomConnect:
+        setModifiedTime( m_RandomConnectThumbModifiedTime, timeModified );
+        break;
+    case ePluginTypeClientPeerUser:
+    case ePluginTypeHostPeerUser:
+        setModifiedTime( m_AvatarModifiedTime, timeModified );
+        break;
+    default:
+        break;
+    }
+}
+
+//============================================================================
+int64_t VxConnectIdent::getHostOrThumbModifiedTime( EPluginType pluginType  )
+{
+    switch( pluginType )
+    {
+    case ePluginTypeClientChatRoom:
+    case ePluginTypeHostChatRoom:
+        return m_ChatRoomThumbModifiedTime;
+    case ePluginTypeClientGroup:
+    case ePluginTypeHostGroup:
+        return m_GroupThumbModifiedTime;
+    case ePluginTypeClientNetwork:
+    case ePluginTypeHostNetwork:
+        return m_NetHostThumbModifiedTime;
+    case ePluginTypeClientRandomConnect:
+    case ePluginTypeHostRandomConnect:
+        return m_RandomConnectThumbModifiedTime;
+    case ePluginTypeClientPeerUser:
+    case ePluginTypeHostPeerUser:
+        return m_AvatarModifiedTime;
+    default:
+        return 0;
+    }
+}
+
+//============================================================================
+/// @brief return indenty unique folder name in the form of OnlineName_GuidHexString
+std::string VxConnectIdent::getIdentFolderName( void )
+{
+    std::string folderName = getOnlineName();
+    folderName += '_';
+    folderName += getMyOnlineIdHexString();
+    return folderName;
+}
+
+//============================================================================
+VxConnectInfo::VxConnectInfo( const VxConnectInfo &rhs )
+    : VxConnectIdent( rhs )
+    , m_s64TimeLastConnectAttemptMs( rhs.m_s64TimeLastConnectAttemptMs )
+    , m_s64TimeTcpLastContactMs( rhs.m_s64TimeTcpLastContactMs )
+{
+}
+
+//============================================================================
+VxConnectInfo& VxConnectInfo::operator =( const VxConnectInfo &rhs )
+{
+	if( this != &rhs )
+	{
+        *((VxConnectIdent*)this) = *((VxConnectIdent*)&rhs);
+        m_s64TimeLastConnectAttemptMs = rhs.m_s64TimeLastConnectAttemptMs;
+        m_s64TimeTcpLastContactMs = rhs.m_s64TimeLastConnectAttemptMs;
+    }
+
+	return *this;
+}
+
+//============================================================================
+bool VxConnectInfo::addToBlob( PktBlobEntry& blob )
+{
+    bool result = VxConnectIdent::addToBlob( blob );
+    result &= blob.setValue( m_s64TimeLastConnectAttemptMs );
+    result &= blob.setValue( m_s64TimeTcpLastContactMs );
+    return result;
+}
+
+//============================================================================
+bool VxConnectInfo::extractFromBlob( PktBlobEntry& blob )
+{
+    bool result = VxConnectIdent::extractFromBlob( blob );
+    result &= blob.getValue( m_s64TimeLastConnectAttemptMs );
+    result &= blob.getValue( m_s64TimeTcpLastContactMs );
+    return result;
+}
+
+//============================================================================
+void VxConnectInfo::setTimeLastConnectAttemptMs( int64_t timeLastAttemptGmtMs )
+{
+	m_s64TimeLastConnectAttemptMs = timeLastAttemptGmtMs;
+}
+
+//============================================================================
+int64_t VxConnectInfo::getTimeLastConnectAttemptMs( void )
+{
+	return m_s64TimeLastConnectAttemptMs;
+}
+
+//============================================================================
+bool VxConnectInfo::isTooSoonToAttemptConnectAgain( void )
+{
+	return ( MIN_INTERVAL_CONNECT_REQUEST_MS > ( GetGmtTimeMs() - m_s64TimeLastConnectAttemptMs ) );
+}
+
+//============================================================================
+void VxConnectInfo::setTimeLastTcpContactMs( int64_t timeGmtMs )
+{
+	m_s64TimeTcpLastContactMs = htonll( timeGmtMs );
+}
+
+//============================================================================
+int64_t	VxConnectInfo::getTimeLastTcpContactMs( void )
+{
+	return ntohll( m_s64TimeTcpLastContactMs );
+}
+
+//============================================================================
+//! get seconds since any last contact
+int64_t VxConnectInfo::getElapsedMsAnyContact( void )	
+{ 
+    return ( GetGmtTimeMs() -  getTimeLastTcpContactMs() );
+}
+
+//============================================================================
+//! get milli seconds since last tcp contact
+int64_t VxConnectInfo::getElapsedMsTcpLastContact( void )	
+{ 
+	return ( GetGmtTimeMs() - getTimeLastTcpContactMs() ); 
+}

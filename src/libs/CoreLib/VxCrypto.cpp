@@ -1,0 +1,377 @@
+//============================================================================
+// Copyright (C) 2013 Brett R. Jones
+//
+// Code copyrighted by Brett R. Jones is under dual license similar to Ruby's license
+// See file COPYING and LEGAL in root of the No Limit Connect project
+//
+// bjones.engineer@gmail.com
+// https://nolimitconnect.com
+//============================================================================
+
+#include "VxCrypto.h"
+#include "VxDebug.h"
+
+#include <memory.h>
+#include <string>
+
+#ifndef _MSC_VER
+#include <sys/time.h>
+#include <cstdlib>
+#endif // _MSC_VER
+
+#include "VxMd5.h"
+
+//===========================================//
+//=== cheezy crypto with known weeknesses ===//
+// issued to public domain year 2006
+//===========================================//
+
+//============================================================================
+VxKey::~VxKey()
+{
+	m_bIsSet = false;
+	memset( m_au32Key, 0xa5, sizeof( m_au32Key ) );
+}
+
+//============================================================================
+//! set key from data..
+int32_t VxKey::importKey( unsigned char * pu8Data, int iLen )
+{
+	if( !pu8Data || 1 > iLen )
+	{
+		LogMsg( LOG_ERROR, "VxKey::importKey invalid param" );
+		vx_assert( false );
+		return -1;
+	}
+
+	//vx_assert( iLen == sizeof( m_au8Key ) );
+	if ( iLen == sizeof( m_au32Key ) )
+	{
+		memcpy( m_au32Key, pu8Data, iLen );
+		m_bIsSet = true;
+		return 0;
+	}
+
+	return -1;
+}
+
+//============================================================================
+//! set encryption key from another
+void VxKey::importKey( VxKey * poKey )
+{
+	memcpy( m_au32Key, poKey->m_au32Key, sizeof( m_au32Key ) );
+	m_bIsSet = poKey->m_bIsSet;
+}
+
+//============================================================================
+//! return key into data buffer
+int32_t VxKey::exportKey( unsigned char * pu8RetKeyData, int iBufLen )
+{
+	if ( iBufLen >= ( int )sizeof( m_au32Key ) )
+	{
+		memcpy( pu8RetKeyData, m_au32Key, sizeof( m_au32Key ) );
+		return 0;
+	}
+
+	return -1;
+}
+
+//============================================================================
+//! export encryption key to another another
+void VxKey::exportKey( VxKey * poKey )
+{
+	memcpy( poKey->m_au32Key, m_au32Key, sizeof( m_au32Key ) );
+	poKey->m_bIsSet = m_bIsSet;
+}
+
+//============================================================================
+void VxKey::exportToAsciiString( std::string& exportedKey )
+{
+#define myToHex(N) (unsigned char)(((N>9) ? ((N)-10+'A'):((N)+'0')))
+	char buf[ CHEEZY_SYM_KEY_LEN * 2 + 1 ];
+	int bufIdx = 0;
+	unsigned char * keyAsBytes = (unsigned char *)m_au32Key;
+	for ( int i = 0; i < CHEEZY_SYM_KEY_LEN; i++ )
+	{
+		unsigned char keyByte = keyAsBytes[ i ];
+		buf[ bufIdx ] = myToHex( ( ( keyByte >> 4 ) & 0x0f ) );
+		bufIdx++;
+		buf[ bufIdx ] = myToHex( ( keyByte & 0x0f ) );
+		bufIdx++;
+	}
+
+	buf[ bufIdx ] = 0;
+	exportedKey = buf;
+}
+
+//============================================================================
+//! make encryption key from user name and password
+int32_t VxKey::setKeyFromPassword( const char*	pUserName,			// user name
+									const char*	pPassword,			// password
+									const char*	pSalt )				// salt
+{
+	std::string strPwd = pUserName;
+	strPwd += pPassword;
+
+	return setKeyFromPassword( strPwd.c_str(), (int)strPwd.size(), pSalt );
+}
+
+//============================================================================
+//! make encryption key from password
+int32_t VxKey::setKeyFromPassword( const char*	pPassword,			// password
+								 int			iPasswordLen,		// length of password	int iPasswordLen )
+								 const char*	pSalt )	// salt
+{
+	if( !pPassword || 1 > iPasswordLen || !pSalt || 4 > strlen( pSalt ) )
+	{
+		LogMsg( LOG_ERROR, "VxKey::setKeyFromPassword invalid param" );
+		vx_assert( false );
+		return -1;
+	}
+
+	// key gen does not seem to be thread save.. TODO make key generation thread safe
+
+	struct VxMD5Context   md5c;
+
+	VxMD5Init( &md5c );
+	VxMD5Update( &md5c, (unsigned char *)pPassword, (unsigned int)iPasswordLen );
+	VxMD5Final( (unsigned char *)m_au32Key, &md5c );
+	m_bIsSet = true;
+
+	return 0;
+}
+
+//============================================================================
+std::string	VxKey::describeKey( void )
+{
+	char descBuf[256];
+	sprintf( descBuf, "{0x%X 0x%X 0x%X 0x%X}", m_au32Key[0], m_au32Key[1], m_au32Key[2], m_au32Key[3] );
+	return descBuf;
+}
+
+//============================================================================
+//============================================================================
+//============================================================================
+
+//============================================================================
+//! generate key from password and set encryption key in one function call
+//! NOTE: Max password len 255
+int32_t VxCrypto::setPassword( const char* pPassword, int iPasswordLen )
+{
+	struct VxMD5Context   md5c;
+	unsigned char       bfvec[ CHEEZY_SYM_KEY_LEN ];
+
+    if ( !pPassword || 1 > iPasswordLen )
+	{
+		LogMsg( LOG_ERROR, "VxCrypto::setPassword invalid param" );
+		vx_assert( false );
+		return -1;
+	}
+
+	VxMD5Init( &md5c );
+	VxMD5Update( &md5c, (unsigned char *)pPassword, (unsigned int)iPasswordLen );
+	VxMD5Final( bfvec, &md5c );
+	BlowsetKey( &m_BlowCtx, bfvec, CHEEZY_SYM_KEY_LEN );
+	m_bIsKeyValid = true;
+	return 0;
+}
+//============================================================================
+//! Generate encryption key from password
+int32_t VxCrypto::generateKey( const char* pPassword, int iPasswordLen, VxKey * poRetKey )
+{
+	struct VxMD5Context   md5c;
+	unsigned char       bfvec[ CHEEZY_SYM_KEY_LEN ];
+
+	if ( pPassword == NULL )
+	{
+		return -1;
+	}
+
+	VxMD5Init( &md5c );
+	VxMD5Update( &md5c, (unsigned char *)pPassword, (unsigned int)iPasswordLen );
+	VxMD5Final( bfvec, &md5c );
+	memcpy( poRetKey->m_au32Key, bfvec, CHEEZY_SYM_KEY_LEN );
+	importKey( poRetKey );
+	return 0;
+}
+//============================================================================
+//! set key used for encryption and decryption
+int32_t VxCrypto::importKey( VxKey * poKey )
+{
+	memcpy( &m_Key, poKey, sizeof( VxKey ) );
+	BlowsetKey( &m_BlowCtx, (unsigned char *)poKey->m_au32Key, CHEEZY_SYM_KEY_LEN );
+	m_bIsKeyValid = true;
+	return 0;
+}
+
+//============================================================================
+//! encrypt some data
+//! NOTE: iDataLen must be a multiple of 16
+int32_t VxCrypto::encrypt( unsigned char * pu8Data, int iDataLen )
+{
+	if ( ( false == m_bIsKeyValid ) || ( iDataLen & 0x0f ) )
+	{
+		return -1;
+	}
+
+	BlowEncrypt( &m_BlowCtx, pu8Data, iDataLen );
+	return 0;
+}
+
+//============================================================================
+//! decrypt some data
+//! NOTE: iDataLen must be a multiple of 16
+int32_t VxCrypto::decrypt( unsigned char * pu8Data, int iDataLen )
+{
+	if ( ( false == m_bIsKeyValid ) || ( iDataLen & 0x0f ) )
+	{
+		return -1;
+	}
+	BlowDecrypt( &m_BlowCtx, pu8Data, iDataLen );
+	return 0;
+}
+
+//============================================================================
+//! encrypt known string
+int32_t VxCrypto::EncryptKnownString( unsigned char * pu8RetData, int iDataLen )
+{
+	if ( ( false == m_bIsKeyValid ) || ( iDataLen != CHEEZY_SYM_KEY_LEN ) )
+	{
+		return -1;
+	}
+	memcpy( pu8RetData, CHEEZY_KNOWN_TEXT_STR, CHEEZY_SYM_KEY_LEN );
+	BlowEncrypt( &m_BlowCtx, pu8RetData, iDataLen );
+	return 0;
+}
+
+//============================================================================
+//! verify data is known text string
+int32_t VxCrypto::VerifyKnownString( unsigned char * pu8Data, int iDataLen )
+{
+	if ( ( false == m_bIsKeyValid ) || ( iDataLen != CHEEZY_SYM_KEY_LEN ) )
+	{
+		return -1;
+	}
+	unsigned char au8Buf[ CHEEZY_SYM_KEY_LEN ];
+	memcpy( au8Buf, pu8Data, CHEEZY_SYM_KEY_LEN );
+	BlowDecrypt( &m_BlowCtx, au8Buf, CHEEZY_SYM_KEY_LEN );
+	return memcmp( au8Buf, CHEEZY_KNOWN_TEXT_STR, CHEEZY_SYM_KEY_LEN );
+}
+
+//============================================================================
+//! fill with random data
+//! NOTE: this is not truly random enough for strong encryption uses
+void CheezyFillRandom( void * pvData, int iLen )
+{
+	unsigned long u32Seed = 0;
+#ifdef _MSC_VER
+	LARGE_INTEGER u64Timer;
+#else
+	timeval tim;
+#endif
+
+	int i;
+	char * pData = (char *)pvData;
+	while ( 1 )
+	{
+#ifdef _MSC_VER
+		SYSTEM_INFO sysinfo;
+		GetSystemInfo( &sysinfo );
+		bool bHaveMultipleCPUS = ( sysinfo.dwNumberOfProcessors > 1 );
+		DWORD_PTR affinityMask;
+		if ( bHaveMultipleCPUS )
+		{
+			affinityMask = SetThreadAffinityMask( GetCurrentThread(), 1 );
+		}
+		QueryPerformanceCounter( &u64Timer );
+		// Restore the true affinity.
+		if ( bHaveMultipleCPUS )
+		{
+			(void)SetThreadAffinityMask( GetCurrentThread(), affinityMask );
+		}
+		u32Seed = u64Timer.LowPart;
+#else
+		gettimeofday( &tim, NULL );
+		u32Seed = tim.tv_usec;
+#endif
+
+		unsigned long u32RandCnt = u32Seed & 0x03;
+		srand( u32Seed );
+		rand();
+		if ( iLen >= 2 )
+		{
+			if ( u32RandCnt )
+			{
+				for ( i = 0; i < (int)u32RandCnt; i++ )
+				{
+					*( (short *)pData ) = rand();
+					while ( 0 == *( (short *)pData ) )
+					{
+						*( (short *)pData ) = rand();
+					}
+				}
+				iLen -= 2;
+				pData += 2;
+			}
+		}
+		else
+		{
+			*pData = (char)rand();
+
+			iLen--;
+			pData++;
+		}
+
+		if ( 0 == iLen )
+		{
+			return;
+		}
+
+		VxSleep( 2 * u32RandCnt );
+	}
+}
+
+//============================================================================
+//! encrypt data with VxCryptoo
+int32_t VxSymEncrypt( VxKey *		poKey,			// Symmetric key must be 16 bytes long
+					char *			pDataIn,		// buffer to encrypt
+					int				iDataLen,		// data length ( must be multiple of key length )
+					char *			pRetBuf )		// if null then encrypted data put in pData
+{
+	vx_assert( poKey );
+	vx_assert( pDataIn );
+	vx_assert( iDataLen );
+	vx_assert( 0 == ( iDataLen & 0x0f ) ); // must be multiple of 16 bytes
+	char * pDataOut = pRetBuf;
+	if ( 0 == pDataOut )
+	{
+		pDataOut = pDataIn;
+	}
+
+	VxCrypto oCrypto;
+	oCrypto.importKey( poKey );
+	return oCrypto.encrypt( (uint8_t *)pDataOut, iDataLen );
+}
+
+//============================================================================
+//! decrypt data with VxCryptoo
+int32_t VxSymDecrypt( VxKey *			poKey,			// Symmetric key must be 16 bytes long
+	char *			pDataIn,		// buffer to decrypt
+	int				iDataLen,		// data length ( must be multiple of key length )
+	char *			pRetBuf )		// if null then encrypted data put in pData
+{
+	vx_assert( poKey );
+	vx_assert( pDataIn );
+	vx_assert( iDataLen );
+	vx_assert( 0 == ( iDataLen & 0x0f ) ); // must be multiple of 16 bytes
+	char * pDataOut = pRetBuf;
+	if ( 0 == pDataOut )
+	{
+		pDataOut = pDataIn;
+	}
+
+	VxCrypto oCrypto;
+	oCrypto.importKey( poKey );
+	return oCrypto.decrypt( (uint8_t *)pDataOut, iDataLen );
+}
+

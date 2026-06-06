@@ -8,15 +8,16 @@ This page is the long-running execution tracker for the Kodi binary add-on imple
 
 ## Current Snapshot
 
-- Date: 2026-06-05
-- Overall phase: Foundation and integration planning
+- Date: 2026-06-06
+- Overall phase: MVP subset execution kickoff
 - Build/runtime context:
-  - Kodi source: `/home/brett/kodi-source` (user-provided)
-  - Kodi build: `/home/brett/build` (user-provided)
-  - NLC source: `/home/brett/NoLimitConnect` (user-provided)
-  - Add-on repo: `/home/brett/kodi-addon-nolimitconnect` (user-provided)
+  - Kodi source: `/home/nolimit/kodi-source`
+  - Kodi build: `/home/nolimit/kodi-source/build`
+  - NLC source: `/home/nolimit/NoLimitConnect`
+  - Add-on repo: `/home/nolimit/kodi-addon-nolimitconnect`
 - Network bootstrap target: `nolimitconnect.net`
 - UI migration direction: Qt desktop UI patterns translated into Kodi native GUI windows/dialogs
+- Plugin compatibility direction: all engine-required plugins must be implemented/integrated; non-MVP plugins default to disabled until Kodi UX is ready
 
 ## Milestones
 
@@ -43,17 +44,26 @@ This page is the long-running execution tracker for the Kodi binary add-on imple
 | 6 | 11 | CamServer | Not Started | Needs camera capture + outbound media path |
 | 7 | 15 | VideoChat | Not Started | Highest complexity: camera + render + motion + recording |
 
+### Compatibility Policy
+
+- Runtime baseline: preserve full NLC plugin compatibility required by engine startup and session routing.
+- MVP exposure: prioritize Kodi UX and testing for slots `8, 9, 10, 11, 12, 15, 16`.
+- Other plugin slots: keep integrated but disabled by default until UI and validation are completed.
+- Acceptance gate: no plugin initialization regressions when full `libs` dependency tree is vendored in this repository.
+
 ## Active Work Queue
 
 | Priority | Task | Status | Owner |
 |---|---|---|---|
-| P0 | Confirm source paths in this environment and normalize to workspace paths | Completed | Copilot + User |
-| P0 | Create initial code skeleton under `src/addon`, `src/gui`, `src/audio`, `src/stream` | Completed | Copilot |
-| P0 | Define first-run username + auto-join flow state machine | Completed (wired scaffold) | Copilot |
-| P1 | Specify event map for `IToGui` callbacks -> Kodi GUI messages | Completed (scaffold) | Copilot |
-| P1 | Specify command map for Kodi actions -> `IFromGui` commands | Completed (scaffold) | Copilot |
-| P1 | Add milestone checklists and acceptance criteria | Not Started | Copilot |
-| P1 | Wire Kodi settings/profile persistence for display name | Completed | Copilot |
+| P0 | Define full-compat + MVP-enabled acceptance criteria across plugin slots | Completed | Copilot + User |
+| P0 | Create code reuse mapping matrix from `/home/nolimit/NoLimitConnect` to add-on modules (including full `libs` import) | Completed (initial v1) | Copilot |
+| P0 | Scaffold docs sections to mirror upstream structure while preserving current site nav | Not Started | Copilot |
+| P1 | Finalize identity + deferred network bootstrap from scaffold to production behavior | In Progress | Copilot |
+| P1 | Implement Messenger (slot 8) end-to-end MVP with Kodi dialogs and bridge commands/events | Not Started | Copilot |
+| P1 | Implement VoicePhone (slot 16) and PushToTalk (slot 9) using shared audio pipeline | Not Started | Copilot |
+| P2 | Implement PersonFileXfer (slot 10) and FileShareServer (slot 12) transfer/streaming path | Not Started | Copilot |
+| P2 | Implement CamServer (slot 11) and VideoChat (slot 15) capture/render path | Not Started | Copilot |
+| P1 | Update technical docs incrementally with each implementation merge | In Progress | Copilot |
 
 ## Decisions Log
 
@@ -75,7 +85,6 @@ This page is the long-running execution tracker for the Kodi binary add-on imple
 ## Runtime Smoke Checklist
 
 - [x] Service discovery test: add-on appears in Kodi Services list after install.
-- [ ] Service startup log test: expect "NoLimitConnect addon service started" in Kodi log during startup.
 - [x] Service startup log test: Kodi service manager starts NLC python bootstrap and emits startup/status logs.
 - [ ] Fresh profile test: `display_name` empty -> add-on emits prompt request event and does not mark network online.
 - [ ] Identity submit test: GUI sends `kProvideDisplayName` command -> setting persists and join command is dispatched.
@@ -88,6 +97,17 @@ Note: With `NLC_ENABLE_DEV_STUBS` enabled, fresh profile startup currently auto-
 
 ## Change Log
 
+- 2026-06-06: Removed Python bootstrap `ctypes.CDLL` startup probe and replaced it with file-presence check to avoid startup popup risk from unintended binary remote-communication initialization.
+- 2026-06-06: Added settings-driven `debug_emit_test_offer` hook to simulate incoming offer/call events and validate warning toast behavior when NLC UI is inactive.
+- 2026-06-06: Added settings-driven debug hooks to simulate NLC UI enter/exit and emit a test inbound message event for validating deferred login and background notifications.
+- 2026-06-06: Added `WindowMain::Open/Close` UI lifecycle hook to dispatch `EnterNlcUi`/`ExitNlcUi`, and added lightweight background toasts for inbound message/offer events when NLC UI is inactive.
+- 2026-06-06: Sign-on scaffold updated to defer join until explicit UI entry command, added random-host leave/join commands, and persisted `last_random_connect_host` default behavior.
+- 2026-06-06: Added `NLC_LIBS_DIR` CMake path support (default `src/libs`) and validated configure/build against imported libs tree.
+- 2026-06-06: Added `developer-docs/reuse-matrix.md` with initial upstream-to-addon mapping and vendor layout plan for full `libs` import.
+- 2026-06-06: Updated architecture direction: all engine-required plugins are in scope for compatibility, with non-MVP plugin slots disabled by default until Kodi UX completion.
+- 2026-06-06: Marked acceptance criteria task complete and delivered initial reuse-matrix v1 for full `libs` import planning.
+- 2026-06-06: Reset active implementation backlog for this workspace context and aligned all build/source paths to `/home/nolimit/*`.
+- 2026-06-06: Established execution rule for this phase: each code milestone ships with corresponding technical documentation updates in the same pass.
 - 2026-06-04: Created initial implementation tracker with milestones, plugin order, decisions, and active work queue.
 - 2026-06-04: Added Milestone M1 code skeleton (CMakeLists, addon.xml, addon entrypoint, core sign-on flow stub, gui/audio/stream placeholders).
 - 2026-06-04: Added KODI source path auto-detection (env + common defaults) to CMake and validated configure with and without explicit `-DKODI_SOURCE_DIR`.

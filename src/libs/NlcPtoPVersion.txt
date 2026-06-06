@@ -1,0 +1,12 @@
+APP_NAME NoLimitConnect
+APP_PACKAGE com.nolimitconnect.org
+COMPANY_NAME NoLimitConnect
+WEBSITE https://nolimitconnect.org/
+APP_EMAIL bjones.engineer@gmail.com
+APP_STICKYURL https://nolimitconnect.org/
+VERSION_MAJOR 1
+VERSION_MINOR 01
+VERSION_TAG 00
+VERSION_CODE 010100
+ADDON_API 16.1.000
+

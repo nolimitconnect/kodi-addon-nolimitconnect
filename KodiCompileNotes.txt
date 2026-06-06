@@ -73,3 +73,13 @@ sudo make install
 
 // log is at 
 ~/.kodi/temp/kodi.log
+
+
+# Post-build verify
+
+1. Run `build-nlc-plugin` from the workspace.
+2. Launch Kodi with the `run-kodi` task.
+3. Confirm these log lines in `~/.kodi/temp/kodi.log`:
+  - `CServiceAddonManager: starting service.binary.nolimitconnect`
+  - `NoLimitConnect addon service started (python bootstrap)`
+  - `Native library load probe succeeded`

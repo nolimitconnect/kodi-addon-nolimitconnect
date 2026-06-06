@@ -1,0 +1,78 @@
+#pragma once
+//============================================================================
+// Copyright (C) 2017 Brett R. Jones 
+//
+// Code copyrighted by Brett R. Jones is under dual license similar to Ruby's license 
+// See file COPYING and LEGAL in root of the No Limit Connect project
+//
+// bjones.engineer@gmail.com
+// https://nolimitconnect.com
+//============================================================================
+
+#include <GuiInterface/IDefs.h>
+#include <CoreLib/VxGUID.h>
+
+class VxUrl
+{
+public:
+	VxUrl();
+	VxUrl( const char* pUrl );
+	VxUrl( std::string& url );
+    VxUrl( const VxUrl& rhs );
+
+    VxUrl&                      operator = ( const VxUrl& rhs );
+    bool                        operator == ( const VxUrl& rhs ) const;
+
+	// return true if has :// in path
+	static bool					isURL( std::string& strFile );
+
+	void						setUrl( const char* pUrl );
+    void						setUrl( std::string url )				    { setUrl( url.c_str() ); }
+	std::string&				getUrl( void )							    { return m_Url; }
+
+	void						setFileName( const std::string& fileName );
+	std::string&				getFileName( void )						    { return m_FileName; }
+	const char*					getProtocol( void );
+
+	const char*					getUser( void );
+	const char*					getPassword( void );
+
+	const char*					getHost( void );
+    std::string                 getHostString( void );
+	uint16_t					getPort( void );
+	void						setPath( const char* pFilePathAndName );
+	const char*					getPath( void );
+	const char*					getQuery( void );
+	const char*					getFragment( void );
+    VxGUID&                     getOnlineId( void )                         { return m_OnlineId; }
+    std::string				    getOnlineIdStr( void )                      { return m_strOnlineId.empty() ? "" : m_strOnlineId.c_str(); }
+    bool                        hasValidOnlineId( void )                    { return m_OnlineId.isValid(); }
+    bool                        validateUrl( bool onlineIdMustBeValid );
+
+	bool						isAbsoluteUrl();
+	const char*					getRelativeURL( std::string& strRetRelativeUrl, bool bWithParam = false );
+	const char*					getAbsoluteURL( std::string& strRetAbsoluteUrl );
+	const char*					getHostURL( const char* host, int port, const char* uri, std::string& buf );
+	void						setHostType( EHostType hostType )			{ m_HostType = hostType; }
+	EHostType					getHostType( void )							{ return m_HostType; }
+
+protected:
+    std::string					m_Url{ "" };
+	std::string					m_FileName{ "" };
+	std::string					m_FileExtension{ "" };
+	std::string					m_ShareName{ "" };
+	std::string					m_strProtocol{ "" };
+	std::string					m_strHost{ "" };
+    uint16_t					m_Port{ 80 };
+	std::string					m_strPath{ "" };
+	std::string					m_strUser{ "" };
+	std::string					m_strPassword{ "" };
+
+	std::string					m_strQuery{ "" };
+	std::string					m_strFragment{ "" };
+    std::string					m_strOnlineId{ "" };
+    VxGUID                      m_OnlineId;
+	EHostType					m_HostType{ eHostTypeUnknown };
+};
+
+
