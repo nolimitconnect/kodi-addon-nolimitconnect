@@ -69,10 +69,12 @@
       </group>
     </category>
 
-    <category id="startup" label="30140" help="30150">
+    <category id="run" label="30140" help="30150">
       <group id="1">
-        <setting id="startup_run_now" type="boolean" label="30141" help="30151">
+        <setting id="run_now" type="boolean" label="30141" help="30151">
           <level>0</level>
+          <visible>true</visible>
+          <enabled>true</enabled>
           <default>false</default>
           <control type="toggle" />
         </setting>

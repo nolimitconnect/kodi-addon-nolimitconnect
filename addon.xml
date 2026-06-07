@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addon id="service.binary.nolimitconnect"
        name="NoLimitConnect"
-      version="0.1.1"
+      version="0.1.2"
        provider-name="NoLimitConnect Project">
   <requires>
     <import addon="xbmc.addon" version="21.0.0" />

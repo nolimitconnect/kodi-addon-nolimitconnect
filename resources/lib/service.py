@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import os
 import random
+import sys
 import socket
 import traceback
+import xml.etree.ElementTree as ET
 
 import xbmc
 import xbmcaddon
@@ -12,6 +14,9 @@ ADDON = xbmcaddon.Addon()
 ADDON_ID = ADDON.getAddonInfo("id")
 ADDON_NAME = ADDON.getAddonInfo("name")
 PROFILE_DIR = xbmcvfs.translatePath(ADDON.getAddonInfo("profile"))
+USERDATA_SETTINGS_PATH = xbmcvfs.translatePath(
+    os.path.join(ADDON.getAddonInfo("profile"), "settings.xml")
+)
 
 DEFAULT_MOOD_MESSAGE = "Let's Communicate!"
 DEFAULT_NETWORK_HOST_URL = "ptop://nolimitconnect.net:45124"
@@ -91,6 +96,30 @@ def notify(heading, message):
 def ensure_profile_dir():
     if PROFILE_DIR and not os.path.exists(PROFILE_DIR):
         os.makedirs(PROFILE_DIR, exist_ok=True)
+
+
+def migrate_legacy_action_settings():
+    if not USERDATA_SETTINGS_PATH or not os.path.exists(USERDATA_SETTINGS_PATH):
+        return
+
+    try:
+        tree = ET.parse(USERDATA_SETTINGS_PATH)
+        root = tree.getroot()
+    except Exception:
+        return
+
+    removed = False
+    for setting in list(root.findall("setting")):
+        if setting.get("id") == "startup_run_now":
+            root.remove(setting)
+            removed = True
+
+    if removed:
+        try:
+            tree.write(USERDATA_SETTINGS_PATH, encoding="utf-8", xml_declaration=True)
+            log("Removed legacy startup_run_now setting from userdata")
+        except Exception:
+            pass
 
 
 def get_profile_username():
@@ -231,6 +260,17 @@ def print_configuration_summary(config):
     log(f"External IP: {config['external_ip'] or '<empty>'}")
 
 
+def perform_startup_login(config):
+    log("Startup login requested", xbmc.LOGINFO)
+    log(f"Logging in as: {config['user_name']}")
+    log(f"Joining preferred host: {config['network_host_url']}")
+
+    if config["connection_mode"] == "direct":
+        log(f"Direct-connect external IP: {config['external_ip'] or '<empty>'}")
+
+    notify(ADDON_NAME, f"Startup login ready for {config['user_name']}")
+
+
 def handle_startup_trigger():
     ensure_default_configuration()
     config = validate_configuration()
@@ -246,26 +286,30 @@ def handle_startup_trigger():
     if config["errors"]:
         notify(ADDON_NAME, "Startup config has validation errors")
     else:
-        notify(ADDON_NAME, "Startup config logged")
+        perform_startup_login(config)
 
-    set_bool_setting("startup_run_now", False)
+    set_bool_setting("run_now", False)
 
 
 def run_service():
     monitor = xbmc.Monitor()
     ensure_profile_dir()
+    migrate_legacy_action_settings()
     ensure_default_configuration()
 
     log("NoLimitConnect addon service started (python bootstrap)")
-    log("Waiting for startup run trigger")
+    log("Waiting for run_now trigger")
 
-    previous_run_trigger = get_bool_setting("startup_run_now")
+    if get_bool_setting("run_now"):
+        handle_startup_trigger()
+
+    previous_run_trigger = get_bool_setting("run_now")
 
     while not monitor.abortRequested():
         if monitor.waitForAbort(1):
             break
 
-        current_run_trigger = get_bool_setting("startup_run_now")
+        current_run_trigger = get_bool_setting("run_now")
         if current_run_trigger and not previous_run_trigger:
             handle_startup_trigger()
         previous_run_trigger = current_run_trigger
@@ -273,9 +317,20 @@ def run_service():
     log("NoLimitConnect addon service stopped")
 
 
+def run_startup_once():
+    ensure_profile_dir()
+    migrate_legacy_action_settings()
+    ensure_default_configuration()
+    log("NoLimitConnect startup button invoked")
+    handle_startup_trigger()
+
+
 if __name__ == "__main__":
     try:
-        run_service()
+        if any(argument == "run_startup" for argument in sys.argv[1:]):
+            run_startup_once()
+        else:
+            run_service()
     except Exception:
         log("Unhandled exception in NoLimitConnect service bootstrap", xbmc.LOGERROR)
         log(traceback.format_exc(), xbmc.LOGERROR)

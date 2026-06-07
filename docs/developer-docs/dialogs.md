@@ -14,6 +14,12 @@ This page defines core dialogs that should be implemented and documented for the
 - Users must be able to leave current random host and join a different one.
 - The most recently joined random host becomes the next default host.
 
+### Service Add-on Trigger Note
+
+- Kodi Add-on Information "Run" (rocket icon) is disabled for service add-ons.
+- Startup/login trigger is provided in add-on settings at Network -> Run Now.
+- Run Now is one-shot and auto-resets to Off after execution.
+
 ---
 
 ## Dialog: Network Setup

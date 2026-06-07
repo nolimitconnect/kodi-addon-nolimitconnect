@@ -96,6 +96,7 @@ Note: With `NLC_ENABLE_DEV_STUBS` enabled, fresh profile startup currently auto-
 
 ## Change Log
 
+- 2026-06-07: Finalized startup trigger UX for current Kodi runtime: use Network -> Run Now (boolean one-shot that auto-resets to Off) and documented that the Add-on Info rocket Run control is disabled for service add-ons.
 - 2026-06-06: Replaced the old debug/Messenger settings page with Identity, Network, and Startup configuration fields, including first-run port prefill and a run trigger that prints the current startup config.
 - 2026-06-06: Landed Messenger MVP scaffold in Python service runtime: settings-driven send trigger, local history persistence, simulated incoming echo reply, show-last-message action, and clear-history action.
 - 2026-06-06: Hardened Python debug toggle handling with multi-key setting lookups (`id`, `addon.id`, `general.id`) and switched to builtin `Notification(...)` for reliable toast display across skins.

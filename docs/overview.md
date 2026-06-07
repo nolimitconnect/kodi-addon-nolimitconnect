@@ -29,6 +29,16 @@ The add-on inherits all of NoLimitConnect's core values:
 
 ## How It Works
 
+### Service Run Behavior in Kodi
+
+This add-on is a Kodi service add-on. In Kodi's Add-on Information screen, the rocket-icon Run control is disabled for service add-ons and is not used as the startup trigger.
+
+To start the configured NLC startup/login flow, use:
+
+- Settings -> Network -> Run Now
+
+Run Now is a one-shot trigger. Turning it on executes startup validation/login and then automatically resets it to Off.
+
 ### 1. Sign-On Flow
 
 ```
