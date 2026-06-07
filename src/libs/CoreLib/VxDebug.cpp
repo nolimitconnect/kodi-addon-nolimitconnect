@@ -140,6 +140,39 @@ uint64_t g_ModuleEnableLoggingFlags = (uint64_t)(
         );
 
 
+#elif defined(KODI_PLUGIN_ENABLED)
+    uint64_t g_ModuleEnableLoggingFlags = (uint64_t)(
+        eLogHackers
+        | eLogFileXfer
+        | eLogConnect
+        | eLogOffer
+        // | eLogSkt
+        // | eLogPkt
+        // | eLogNetworkState
+        // | eLogSession
+        | eLogIsPortOpenTest
+        // | eLogThread
+         | eLogWebCam
+         | eLogAssets
+         | eLogUsers
+        // | eLogWindowPositions
+        | eLogStartup
+        | eLogHostJoin
+        | eLogStreams
+        // | eLogSktData
+        //| eLogSktData
+        | eLogOffer
+        | eLogPortForward
+        | eLogNetService
+        // | eLogRunTest
+        | eLogHostConnect
+        // | eLogHostSearch
+        | eLogStreams
+        // | eLogPlayerNlc
+        // | eLogFfmpeg
+        // | eLogAudioIo
+        // | eLogVideoIo
+         );
 #else
     uint64_t g_ModuleEnableLoggingFlags = (uint64_t)eLogHackers;
 #endif // defined(DEBUG)

@@ -304,6 +304,7 @@ endif()
 
 target_include_directories(ptopengine
   PRIVATE
+        ./
     ../
     ../libplayer-nlc/xbmc
     ../ffmpeg

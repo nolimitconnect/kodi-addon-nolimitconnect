@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 namespace nlc
 {
 class NlcAddon;
@@ -14,6 +16,7 @@ public:
   explicit WindowMain(NlcAddon& addon);
 
   bool Open();
+  bool OpenStartupDebugWindow(const std::function<void()>& startupSequence);
   void Close();
 
 private:

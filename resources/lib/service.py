@@ -4,10 +4,12 @@ import random
 import sys
 import socket
 import traceback
+import ctypes
 import xml.etree.ElementTree as ET
 
 import xbmc
 import xbmcaddon
+import xbmcgui
 import xbmcvfs
 
 ADDON = xbmcaddon.Addon()
@@ -22,6 +24,144 @@ DEFAULT_MOOD_MESSAGE = "Let's Communicate!"
 DEFAULT_NETWORK_HOST_URL = "ptop://nolimitconnect.net:45124"
 DEFAULT_CONNECTION_TEST_URL = "ptop://nolimitconnect.xyz:45124"
 DEFAULT_CONNECTION_MODE = "0"
+
+_NATIVE_TRIGGER_LIB = None
+_NATIVE_TRIGGER_LOAD_ERROR = ""
+_NATIVE_TRIGGER_ENABLED = os.environ.get("NLC_ENABLE_NATIVE_TRIGGER", "").strip() == "1"
+_NATIVE_TRIGGER_STAGE_RAW = os.environ.get("NLC_NATIVE_TRIGGER_STAGE", "").strip()
+
+
+def native_stage_from_env():
+    if _NATIVE_TRIGGER_STAGE_RAW == "":
+        return None
+
+    try:
+        return int(_NATIVE_TRIGGER_STAGE_RAW)
+    except ValueError:
+        return None
+
+
+def format_native_result(code, detail):
+    if detail:
+        return f"code={code} ({detail})"
+    return f"code={code}"
+
+
+def get_native_trigger_library():
+    global _NATIVE_TRIGGER_LIB
+    global _NATIVE_TRIGGER_LOAD_ERROR
+    if _NATIVE_TRIGGER_LIB is not None:
+        return _NATIVE_TRIGGER_LIB
+
+    addon_path = xbmcvfs.translatePath(ADDON.getAddonInfo("path"))
+    library_path = os.path.join(addon_path, "libkodi-addon-nolimitconnect.so")
+    log(f"Native trigger load probe: {library_path}", xbmc.LOGINFO)
+    if not os.path.exists(library_path):
+        _NATIVE_TRIGGER_LOAD_ERROR = f"library missing at {library_path}"
+        log(f"Native trigger library missing: {library_path}", xbmc.LOGWARNING)
+        return None
+
+    try:
+        rtld_global = getattr(os, "RTLD_GLOBAL", 0)
+        rtld_lazy = getattr(os, "RTLD_LAZY", 1)
+        lib = ctypes.CDLL(library_path, mode=rtld_global | rtld_lazy)
+        lib.NlcRunNowTrigger.argtypes = [
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+            ctypes.c_char_p,
+        ]
+        lib.NlcRunNowTrigger.restype = ctypes.c_int
+        _NATIVE_TRIGGER_LIB = lib
+        _NATIVE_TRIGGER_LOAD_ERROR = ""
+        log("Native trigger library load probe succeeded", xbmc.LOGINFO)
+        return _NATIVE_TRIGGER_LIB
+    except Exception as ex:
+        _NATIVE_TRIGGER_LOAD_ERROR = f"load error: {ex}"
+        log(f"Failed to load native trigger library: {ex}", xbmc.LOGERROR)
+        return None
+
+
+def trigger_native_startup(config):
+    if not _NATIVE_TRIGGER_ENABLED:
+        return {
+            "ok": False,
+            "code": 0,
+            "detail": "native trigger skipped (disabled)",
+            "skipped": True,
+        }
+
+    configured_stage = native_stage_from_env()
+    if configured_stage is None:
+        return {
+            "ok": False,
+            "code": 0,
+            "detail": "native trigger skipped (stage not configured)",
+            "skipped": True,
+        }
+
+    lib = get_native_trigger_library()
+    if lib is None:
+        detail = _NATIVE_TRIGGER_LOAD_ERROR or "library unavailable"
+        return {
+            "ok": False,
+            "code": -998,
+            "detail": detail,
+        }
+
+    addon_path = xbmcvfs.translatePath(ADDON.getAddonInfo("path"))
+    profile_dir = PROFILE_DIR
+    mood_message = config["mood_message"] or ""
+    preferred_host = config["network_host_url"] or ""
+
+    log(f"Invoking NlcRunNowTrigger (stage={configured_stage})", xbmc.LOGINFO)
+
+    try:
+        result = lib.NlcRunNowTrigger(
+            addon_path.encode("utf-8"),
+            profile_dir.encode("utf-8"),
+            config["user_name"].encode("utf-8"),
+            mood_message.encode("utf-8"),
+            preferred_host.encode("utf-8"),
+        )
+    except Exception as ex:
+        log(f"Native startup trigger raised exception: {ex}", xbmc.LOGERROR)
+        return {
+            "ok": False,
+            "code": -999,
+            "detail": "ctypes exception",
+        }
+
+    log(f"NlcRunNowTrigger returned code {result}", xbmc.LOGINFO)
+
+    native_details = {
+        1: "startup/login dispatched",
+        0: "preflight/partial stage (Python fallback)",
+        -996: "native stage not set",
+        -997: "native trigger disabled",
+        -1: "invalid arguments",
+        -2: "native exception",
+    }
+    detail = native_details.get(result, "unknown result")
+
+    if result <= 0:
+        log(
+            f"Native startup trigger failed with {format_native_result(result, detail)}",
+            xbmc.LOGERROR,
+        )
+        return {
+            "ok": False,
+            "code": result,
+            "detail": detail,
+        }
+
+    log("Native startup trigger completed", xbmc.LOGINFO)
+    return {
+        "ok": True,
+        "code": result,
+        "detail": detail,
+    }
 
 
 def _setting_keys(setting_id):
@@ -91,6 +231,44 @@ def notify(heading, message):
     safe_heading = heading.replace(",", " ")
     safe_message = message.replace(",", " ")
     xbmc.executebuiltin(f"Notification({safe_heading},{safe_message},4000)")
+
+
+def read_recent_debug_lines(max_lines=350):
+    log_path = xbmcvfs.translatePath("special://logpath/kodi.log")
+    if not log_path or not os.path.exists(log_path):
+        return ["Kodi log file not found yet"]
+
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="replace") as log_file:
+            lines = log_file.readlines()
+    except Exception as ex:
+        return [f"Unable to read Kodi log: {ex}"]
+
+    interesting = []
+    for line in lines:
+        lowered = line.lower()
+        if (
+            "[service.binary.nolimitconnect]" in lowered
+            or "[vxdebug]" in lowered
+            or "nlcrunnowtrigger" in lowered
+            or "ptopengine" in lowered
+        ):
+            interesting.append(line.rstrip("\n"))
+
+    if not interesting:
+        interesting = ["No NLC/Vx debug lines found yet"]
+
+    return interesting[-max_lines:]
+
+
+def show_debug_log_window(status_message=""):
+    lines = read_recent_debug_lines()
+    if status_message:
+        lines.insert(0, f"Status: {status_message}")
+        lines.insert(1, "")
+
+    body = "\n".join(lines)
+    xbmcgui.Dialog().textviewer("NoLimitConnect Debug Log", body, usemono=True)
 
 
 def ensure_profile_dir():
@@ -286,7 +464,46 @@ def handle_startup_trigger():
     if config["errors"]:
         notify(ADDON_NAME, "Startup config has validation errors")
     else:
-        perform_startup_login(config)
+        native_result = trigger_native_startup(config)
+        if native_result["ok"]:
+            status_text = (
+                f"Native startup/login dispatched for {config['user_name']} "
+                f"({format_native_result(native_result['code'], native_result['detail'])})"
+            )
+            notify(
+                ADDON_NAME,
+                status_text,
+            )
+            show_debug_log_window(status_text)
+        else:
+            if native_result.get("skipped"):
+                log(
+                    (
+                        "Native trigger probe skipped "
+                        f"({native_result.get('detail', 'no detail')}); "
+                        "startup is handled by binary run_now setting callback"
+                    ),
+                    xbmc.LOGINFO,
+                )
+                status_text = "Native trigger skipped; running Python startup flow"
+                notify(ADDON_NAME, status_text)
+            else:
+                status_text = (
+                    "Native trigger failed "
+                    f"({format_native_result(native_result['code'], native_result['detail'])}); "
+                    "using Python fallback"
+                )
+                notify(
+                    ADDON_NAME,
+                    status_text,
+                )
+
+            if not native_result.get("skipped"):
+                perform_startup_login(config)
+            else:
+                perform_startup_login(config)
+
+            show_debug_log_window(status_text)
 
     set_bool_setting("run_now", False)
 

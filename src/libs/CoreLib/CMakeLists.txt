@@ -199,6 +199,7 @@ nlc_target_add_supported_warning_options(CoreLib CXX
 )
 
 target_include_directories(CoreLib PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/..")
+target_include_directories(CoreLib PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 
 target_compile_definitions(CoreLib
     PRIVATE

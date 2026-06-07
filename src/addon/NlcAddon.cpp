@@ -7,8 +7,11 @@
 
 #include <kodi/AddonBase.h>
 
+#include <CoreLib/VxDebug.h>
 #include <PktLib/PktAnnounce.h>
 #include <libptopengine/P2PEngine/P2PEngine.h>
+
+#include "gui/WindowMain.h"
 
 enum EAppDir : int
 {
@@ -21,6 +24,46 @@ void VxSetRootXferDirectory(const char* rootXferDir);
 
 namespace nlc
 {
+
+namespace
+{
+
+ADDON_LOG ToKodiLogLevel(uint32_t vxLogFlags)
+{
+  const uint32_t priority = vxLogFlags & LOG_PRIORITY_MASK;
+  if ((priority & LOG_FATAL) != 0 || (priority & LOG_ASSERT) != 0 || (priority & LOG_ERROR) != 0)
+  {
+    return ADDON_LOG_ERROR;
+  }
+
+  if ((priority & LOG_WARN) != 0)
+  {
+    return ADDON_LOG_WARNING;
+  }
+
+  if ((priority & LOG_DEBUG) != 0 || (priority & LOG_VERBOSE) != 0)
+  {
+    return ADDON_LOG_DEBUG;
+  }
+
+  return ADDON_LOG_INFO;
+}
+
+} // namespace
+
+class KodiVxLogCallback final : public ILogCallbackInterface
+{
+public:
+  void onLogEvent(uint32_t u32LogFlags, const char* logMsg) override
+  {
+    if (logMsg == nullptr)
+    {
+      return;
+    }
+
+    kodi::Log(ToKodiLogLevel(u32LogFlags), "[VxDebug] %s", logMsg);
+  }
+};
 
 namespace
 {
@@ -78,6 +121,12 @@ std::string EnsureTrailingSlash(std::string value)
 
 void NlcAddon::Initialize()
 {
+  if (!m_vxLogCallback)
+  {
+    m_vxLogCallback = new KodiVxLogCallback();
+    VxAddLogHandler(m_vxLogCallback);
+  }
+
   WireBridgeHandlers();
   InitializeStorageAndEngine();
 
@@ -101,6 +150,13 @@ void NlcAddon::Initialize()
 
 void NlcAddon::Shutdown()
 {
+  if (m_vxLogCallback)
+  {
+    VxRemoveLogHandler(m_vxLogCallback);
+    delete m_vxLogCallback;
+    m_vxLogCallback = nullptr;
+  }
+
   EmitStatusEvent("Addon shutdown requested");
   m_signOnFlow.Reset();
 }
@@ -108,6 +164,24 @@ void NlcAddon::Shutdown()
 bool NlcAddon::HandleSettingChanged(const std::string& settingName,
                                     const kodi::addon::CSettingValue& settingValue)
 {
+  if (settingName == "run_now")
+  {
+    if (!settingValue.GetBoolean())
+    {
+      return true;
+    }
+
+    gui::WindowMain debugWindow(*this);
+    const bool opened = debugWindow.OpenStartupDebugWindow([this]() { RunStartupSequence(); });
+    if (!opened)
+    {
+      RunStartupSequence();
+    }
+
+    kodi::addon::SetSettingBoolean("run_now", false);
+    return true;
+  }
+
   if (settingName == "debug_nlc_ui_active")
   {
     if (settingValue.GetBoolean())
@@ -241,6 +315,32 @@ std::optional<addon::ToGuiEvent> NlcAddon::PollGuiEvent()
 const core::SignOnSnapshot& NlcAddon::GetSignOnSnapshot() const
 {
   return m_signOnFlow.GetSnapshot();
+}
+
+bool NlcAddon::RunStartupSequence()
+{
+  m_signOnFlow.RequestNetworkJoinFromUiEntry();
+  UpdateEngineIdentityFromSettings();
+  MaybeStartEngineUserLogon();
+
+  if (m_signOnFlow.NeedsDisplayNamePrompt())
+  {
+    EmitDisplayNamePromptEvent("Display name is required before joining the network");
+    return false;
+  }
+
+  std::string hostToJoin = m_signOnFlow.GetSnapshot().preferredRandomConnectHost;
+  if (hostToJoin.empty())
+  {
+    hostToJoin = LoadLastRandomConnectHost().value_or("");
+  }
+
+  DispatchGuiCommand({addon::FromGuiCommandType::kJoinDefaultNetwork,
+                      std::nullopt,
+                      std::nullopt,
+                      hostToJoin});
+  EmitStatusEvent("Run Now triggered native login/join flow");
+  return true;
 }
 
 void NlcAddon::WireBridgeHandlers()

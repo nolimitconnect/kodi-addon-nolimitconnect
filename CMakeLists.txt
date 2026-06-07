@@ -1,10 +1,20 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(kodi-addon-nolimitconnect LANGUAGES CXX)
+project(kodi-addon-nolimitconnect LANGUAGES C CXX ASM)
+
+option(KODI_PLUGIN_ENABLED "Build with Kodi plugin integration enabled" ON)
+if(KODI_PLUGIN_ENABLED)
+  add_compile_definitions(KODI_PLUGIN_ENABLED=1)
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build libraries as static" FORCE)
+
+include(CheckCCompilerFlag)
+include(CheckCXXCompilerFlag)
 
 set(NLC_PLATFORM_DEFINES)
 
@@ -41,6 +51,7 @@ else()
 endif()
 
 option(NLC_ENABLE_DEV_STUBS "Enable development stubs for non-wired components" ON)
+option(NLC_BUILD_VENDORED_LIBS "Build and link required vendored NLC static libraries" ON)
 
 set(NLC_LIBS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/libs" CACHE PATH
   "Path to imported NoLimitConnect libs tree (contains GuiInterface, libptopengine, CoreLib, etc.)")
@@ -93,10 +104,59 @@ else()
   message(WARNING "NLC libs directory not found at '${NLC_LIBS_DIR}'. Configure with -DNLC_LIBS_DIR=/path/to/libs once copied.")
 endif()
 
+function(nlc_target_add_supported_warning_options target_name language)
+  foreach(flag IN LISTS ARGN)
+    string(MAKE_C_IDENTIFIER "${flag}" flag_id)
+    if(language STREQUAL "C")
+      check_c_compiler_flag("${flag}" "NLC_HAS_C_FLAG_${flag_id}")
+      if(NLC_HAS_C_FLAG_${flag_id})
+        target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:C>:${flag}>")
+      endif()
+    elseif(language STREQUAL "CXX")
+      check_cxx_compiler_flag("${flag}" "NLC_HAS_CXX_FLAG_${flag_id}")
+      if(NLC_HAS_CXX_FLAG_${flag_id})
+        target_compile_options(${target_name} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${flag}>")
+      endif()
+    endif()
+  endforeach()
+endfunction()
+
+set(NLC_VENDORED_LIB_TARGETS)
+if(NLC_BUILD_VENDORED_LIBS AND EXISTS "${NLC_LIBS_DIR}")
+  set(NLC_LIBS_BINARY_DIR "${CMAKE_BINARY_DIR}/nlc-libs")
+  add_compile_definitions(${NLC_PLATFORM_DEFINES})
+  add_compile_definitions(HAVE_CONFIG_H LIB_STATIC)
+  if(KODI_PLUGIN_ENABLED)
+    add_compile_definitions(ENABLE_NLC_PLAYER)
+  endif()
+
+  # Keep include resolution compatible with the upstream libs tree layout.
+  include_directories("${NLC_LIBS_DIR}" "${NLC_LIBS_DIR}/.." "${NLC_LIBS_BINARY_DIR}")
+
+  add_subdirectory("${NLC_LIBS_DIR}/ffmpeg/opus" "${NLC_LIBS_BINARY_DIR}/ffmpegopus")
+  add_subdirectory("${NLC_LIBS_DIR}/CoreLib" "${NLC_LIBS_BINARY_DIR}/CoreLib")
+  add_subdirectory("${NLC_LIBS_DIR}/MediaToolsLib" "${NLC_LIBS_BINARY_DIR}/MediaToolsLib")
+  add_subdirectory("${NLC_LIBS_DIR}/NetLib" "${NLC_LIBS_BINARY_DIR}/NetLib")
+  add_subdirectory("${NLC_LIBS_DIR}/PktLib" "${NLC_LIBS_BINARY_DIR}/PktLib")
+  add_subdirectory("${NLC_LIBS_DIR}/VxVideoLib" "${NLC_LIBS_BINARY_DIR}/VxVideoLib")
+  add_subdirectory("${NLC_LIBS_DIR}/libptopengine" "${NLC_LIBS_BINARY_DIR}/libptopengine")
+
+  list(APPEND NLC_VENDORED_LIB_TARGETS
+    ptopengine
+    mediatools
+    netlib
+    pktlib
+    CoreLib
+    vxvideolib
+    ffmpegopus
+  )
+endif()
+
 set(NLC_SOURCES
   src/addon/addon.cpp
   src/addon/FromGuiBridge.cpp
   src/addon/NlcAddon.cpp
+  src/addon/NlcNativeTrigger.cpp
   src/addon/ToGuiBridge.cpp
   src/core/SignOnFlow.cpp
   src/gui/WindowMain.cpp
@@ -116,6 +176,13 @@ target_compile_definitions(kodi-addon-nolimitconnect
     ${NLC_PLATFORM_DEFINES}
     $<$<BOOL:${NLC_ENABLE_DEV_STUBS}>:NLC_ENABLE_DEV_STUBS=1>
 )
+
+if(NLC_VENDORED_LIB_TARGETS)
+  target_link_libraries(kodi-addon-nolimitconnect
+    PRIVATE
+      ${NLC_VENDORED_LIB_TARGETS}
+  )
+endif()
 
 set_target_properties(kodi-addon-nolimitconnect PROPERTIES
   OUTPUT_NAME "kodi-addon-nolimitconnect"

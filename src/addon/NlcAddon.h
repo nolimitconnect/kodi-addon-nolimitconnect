@@ -13,6 +13,8 @@ namespace kodi::addon
 class CSettingValue;
 }
 
+class ILogCallbackInterface;
+
 namespace nlc
 {
 
@@ -34,6 +36,7 @@ public:
 
 private:
   void WireBridgeHandlers();
+  bool RunStartupSequence();
   void InitializeStorageAndEngine();
   void UpdateEngineIdentityFromSettings();
   void MaybeStartEngineUserLogon();
@@ -57,6 +60,7 @@ private:
   std::string m_userSpecificDir;
   std::string m_userXferDir;
   bool m_isNlcUiActive{false};
+  ::ILogCallbackInterface* m_vxLogCallback{nullptr};
 };
 
 } // namespace nlc
