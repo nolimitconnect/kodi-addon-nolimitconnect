@@ -16,18 +16,28 @@ PROFILE_DIR = xbmcvfs.translatePath(ADDON.getAddonInfo("profile"))
 DEFAULT_MOOD_MESSAGE = "Let's Communicate!"
 DEFAULT_NETWORK_HOST_URL = "ptop://nolimitconnect.net:45124"
 DEFAULT_CONNECTION_TEST_URL = "ptop://nolimitconnect.xyz:45124"
-DEFAULT_CONNECTION_MODE = "connection_test"
+DEFAULT_CONNECTION_MODE = "0"
 
 
 def _setting_keys(setting_id):
-    return (
-        setting_id,
-        f"{ADDON_ID}.{setting_id}",
-        f"general.{setting_id}",
-        f"identity.{setting_id}",
-        f"network.{setting_id}",
-        f"startup.{setting_id}",
-    )
+    return (setting_id,)
+
+
+def _legacy_setting_keys(setting_id):
+    legacy = {
+        "user_name": ("display_name", f"{ADDON_ID}.display_name", "general.display_name"),
+        "network_host_url": (
+            "last_random_connect_host",
+            f"{ADDON_ID}.last_random_connect_host",
+            "general.last_random_connect_host",
+        ),
+        "connection_mode": (
+            f"{ADDON_ID}.connection_mode",
+            "general.connection_mode",
+            "network.connection_mode",
+        ),
+    }
+    return legacy.get(setting_id, ())
 
 
 def log(message, level=xbmc.LOGINFO):
@@ -42,6 +52,15 @@ def get_setting(setting_id, default=""):
             continue
         if value != "":
             return value
+
+    for key in _legacy_setting_keys(setting_id):
+        try:
+            value = ADDON.getSetting(key)
+        except Exception:
+            continue
+        if value != "":
+            return value
+
     return default
 
 
@@ -104,6 +123,13 @@ def parse_port(value):
         return None
 
 
+def parse_connection_mode(value):
+    text = str(value).strip().lower()
+    if text in ("1", "direct"):
+        return "direct"
+    return "connection_test"
+
+
 def is_port_free(port):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -142,8 +168,11 @@ def ensure_default_configuration():
     if get_setting("connection_test_url", "").strip() == "":
         set_setting("connection_test_url", DEFAULT_CONNECTION_TEST_URL)
 
-    if get_setting("connection_mode", "").strip() == "":
+    current_mode = get_setting("connection_mode", "").strip().lower()
+    if current_mode == "":
         set_setting("connection_mode", DEFAULT_CONNECTION_MODE)
+    elif current_mode in ("direct", "connection_test"):
+        set_setting("connection_mode", "1" if current_mode == "direct" else "0")
 
 
 def validate_configuration():
@@ -155,7 +184,7 @@ def validate_configuration():
     listen_port = parse_port(get_setting("listen_port", ""))
     network_host_url = get_setting("network_host_url", "").strip()
     connection_test_url = get_setting("connection_test_url", "").strip()
-    connection_mode = get_setting("connection_mode", DEFAULT_CONNECTION_MODE).strip()
+    connection_mode = parse_connection_mode(get_setting("connection_mode", DEFAULT_CONNECTION_MODE))
     external_ip = get_setting("external_ip", "").strip()
 
     if not is_valid_username(user_name):
@@ -174,9 +203,6 @@ def validate_configuration():
 
     if not connection_test_url:
         errors.append("Connection Test Url is required")
-
-    if connection_mode not in ("connection_test", "direct"):
-        errors.append("Connection mode must be connection_test or direct")
 
     if connection_mode == "direct" and not external_ip:
         warnings.append("External IP is empty while direct-connect mode is selected")

@@ -88,7 +88,7 @@ void NlcAddon::Initialize()
   {
 #if defined(NLC_ENABLE_DEV_STUBS)
     const std::string fallbackName = GenerateDevStubDisplayName();
-    kodi::addon::SetSettingString("display_name", fallbackName);
+  kodi::addon::SetSettingString("user_name", fallbackName);
     m_signOnFlow.ProvideDisplayName(fallbackName);
     EmitStatusEvent("Using dev-stub fallback display name");
 #else
@@ -154,11 +154,11 @@ bool NlcAddon::HandleSettingChanged(const std::string& settingName,
     return true;
   }
 
-  if (settingName == "last_random_connect_host")
+  if (settingName == "network_host_url" || settingName == "last_random_connect_host")
   {
     const std::string trimmedHost = TrimWhitespace(settingValue.GetString());
     m_signOnFlow.SetPreferredRandomConnectHost(trimmedHost);
-    kodi::addon::SetSettingString("last_random_connect_host", m_signOnFlow.GetSnapshot().preferredRandomConnectHost);
+    kodi::addon::SetSettingString("network_host_url", m_signOnFlow.GetSnapshot().preferredRandomConnectHost);
     EmitStatusEvent("Updated preferred random connect host");
     return true;
   }
@@ -196,7 +196,7 @@ bool NlcAddon::HandleSettingChanged(const std::string& settingName,
   }
 
   const std::string trimmedValue = TrimWhitespace(settingValue.GetString());
-  kodi::addon::SetSettingString("display_name", trimmedValue);
+  kodi::addon::SetSettingString("user_name", trimmedValue);
 
   m_signOnFlow.ProvideDisplayName(trimmedValue);
   UpdateEngineIdentityFromSettings();
@@ -272,7 +272,7 @@ void NlcAddon::WireBridgeHandlers()
   m_fromGuiBridge.RegisterHandler(addon::FromGuiCommandType::kProvideDisplayName,
                                   [this](const addon::FromGuiCommand& command) {
                                     const std::string trimmedName = TrimWhitespace(command.payload);
-                                    kodi::addon::SetSettingString("display_name", trimmedName);
+                                    kodi::addon::SetSettingString("user_name", trimmedName);
                                     m_signOnFlow.ProvideDisplayName(trimmedName);
                                     UpdateEngineIdentityFromSettings();
                                     MaybeStartEngineUserLogon();
@@ -301,7 +301,7 @@ void NlcAddon::WireBridgeHandlers()
                                     }
 
                                     m_signOnFlow.MarkJoinedNetwork(hostToJoin);
-                                    kodi::addon::SetSettingString("last_random_connect_host", hostToJoin);
+                                    kodi::addon::SetSettingString("network_host_url", hostToJoin);
 
                                     m_toGuiBridge.PostEvent({
                                       addon::ToGuiEventType::kNetworkStateChanged,
