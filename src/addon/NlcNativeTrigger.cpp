@@ -238,3 +238,31 @@ extern "C" int NlcRunNowTrigger(const char* addonPath,
     return -2;
   }
 }
+
+extern "C" int NlcRunAppShutdown(void)
+{
+  try
+  {
+    if (!g_engineStarted)
+    {
+      NlcLog(ADDON_LOG_INFO, "NlcRunAppShutdown: engine already stopped");
+      return 0;
+    }
+
+    NlcLog(ADDON_LOG_INFO, "NlcRunAppShutdown: entering fromGuiAppShutdown");
+    GetPtoPEngine().fromGuiAppShutdown();
+    g_engineStarted = false;
+    NlcLog(ADDON_LOG_INFO, "NlcRunAppShutdown: engine shutdown completed");
+    return 1;
+  }
+  catch (const std::exception& ex)
+  {
+    NlcLog(ADDON_LOG_ERROR, "NlcRunAppShutdown exception: %s", ex.what());
+    return -1;
+  }
+  catch (...)
+  {
+    NlcLog(ADDON_LOG_ERROR, "NlcRunAppShutdown exception: unknown");
+    return -2;
+  }
+}

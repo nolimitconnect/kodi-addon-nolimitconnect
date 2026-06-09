@@ -25,6 +25,16 @@ DEFAULT_NETWORK_HOST_URL = "ptop://nolimitconnect.net:45124"
 DEFAULT_CONNECTION_TEST_URL = "ptop://nolimitconnect.xyz:45124"
 DEFAULT_CONNECTION_MODE = "0"
 
+HOME_WINDOW_ID = 10000
+COMMAND_PROPERTY = "nlc.command"
+STATUS_PROPERTY = "nlc.service_status"
+
+STATUS_IDLE = "idle"
+STATUS_STARTING = "starting"
+STATUS_RUNNING = "running"
+STATUS_ERROR = "error"
+STATUS_SHUTTING_DOWN = "shutting_down"
+
 _NATIVE_TRIGGER_LIB = None
 _NATIVE_TRIGGER_LOAD_ERROR = ""
 _NATIVE_TRIGGER_ENABLED = os.environ.get("NLC_ENABLE_NATIVE_TRIGGER", "").strip() == "1"
@@ -73,6 +83,8 @@ def get_native_trigger_library():
             ctypes.c_char_p,
         ]
         lib.NlcRunNowTrigger.restype = ctypes.c_int
+        lib.NlcRunAppShutdown.argtypes = []
+        lib.NlcRunAppShutdown.restype = ctypes.c_int
         _NATIVE_TRIGGER_LIB = lib
         _NATIVE_TRIGGER_LOAD_ERROR = ""
         log("Native trigger library load probe succeeded", xbmc.LOGINFO)
@@ -164,6 +176,48 @@ def trigger_native_startup(config):
     }
 
 
+def trigger_native_shutdown():
+    lib = get_native_trigger_library()
+    if lib is None:
+        detail = _NATIVE_TRIGGER_LOAD_ERROR or "library unavailable"
+        return {
+            "ok": False,
+            "code": -998,
+            "detail": detail,
+        }
+
+    try:
+        result = lib.NlcRunAppShutdown()
+    except Exception as ex:
+        log(f"Native shutdown trigger raised exception: {ex}", xbmc.LOGERROR)
+        return {
+            "ok": False,
+            "code": -999,
+            "detail": "ctypes exception",
+        }
+
+    native_details = {
+        1: "shutdown dispatched",
+        0: "engine already stopped",
+        -1: "native exception",
+        -2: "native exception",
+    }
+    detail = native_details.get(result, "unknown result")
+
+    if result < 0:
+        return {
+            "ok": False,
+            "code": result,
+            "detail": detail,
+        }
+
+    return {
+        "ok": True,
+        "code": result,
+        "detail": detail,
+    }
+
+
 def _setting_keys(setting_id):
     return (setting_id,)
 
@@ -233,6 +287,32 @@ def notify(heading, message):
     xbmc.executebuiltin(f"Notification({safe_heading},{safe_message},4000)")
 
 
+def get_home_window():
+    return xbmcgui.Window(HOME_WINDOW_ID)
+
+
+def get_home_property(name):
+    try:
+        return get_home_window().getProperty(name).strip()
+    except Exception:
+        return ""
+
+
+def set_home_property(name, value):
+    try:
+        get_home_window().setProperty(name, str(value))
+    except Exception:
+        pass
+
+
+def clear_command_property():
+    set_home_property(COMMAND_PROPERTY, "")
+
+
+def set_service_status(status):
+    set_home_property(STATUS_PROPERTY, status)
+
+
 def read_recent_debug_lines(max_lines=350):
     log_path = xbmcvfs.translatePath("special://logpath/kodi.log")
     if not log_path or not os.path.exists(log_path):
@@ -259,16 +339,6 @@ def read_recent_debug_lines(max_lines=350):
         interesting = ["No NLC/Vx debug lines found yet"]
 
     return interesting[-max_lines:]
-
-
-def show_debug_log_window(status_message=""):
-    lines = read_recent_debug_lines()
-    if status_message:
-        lines.insert(0, f"Status: {status_message}")
-        lines.insert(1, "")
-
-    body = "\n".join(lines)
-    xbmcgui.Dialog().textviewer("NoLimitConnect Debug Log", body, usemono=True)
 
 
 def ensure_profile_dir():
@@ -463,6 +533,9 @@ def handle_startup_trigger():
 
     if config["errors"]:
         notify(ADDON_NAME, "Startup config has validation errors")
+        set_service_status(STATUS_ERROR)
+        set_bool_setting("run_now", False)
+        return False
     else:
         native_result = trigger_native_startup(config)
         if native_result["ok"]:
@@ -474,7 +547,7 @@ def handle_startup_trigger():
                 ADDON_NAME,
                 status_text,
             )
-            show_debug_log_window(status_text)
+            set_service_status(STATUS_RUNNING)
         else:
             if native_result.get("skipped"):
                 log(
@@ -502,10 +575,57 @@ def handle_startup_trigger():
                 perform_startup_login(config)
             else:
                 perform_startup_login(config)
-
-            show_debug_log_window(status_text)
+            set_service_status(STATUS_RUNNING)
 
     set_bool_setting("run_now", False)
+    return True
+
+
+def handle_command(command):
+    normalized = (command or "").strip().lower()
+    if normalized == "":
+        return
+
+    if normalized in ("start_engine", "start", "run_startup"):
+        current_status = get_home_property(STATUS_PROPERTY)
+        if current_status == STATUS_RUNNING:
+            log("Command start_engine ignored; engine already running", xbmc.LOGINFO)
+            notify(ADDON_NAME, "NoLimitConnect is already running")
+        else:
+            log("Command start_engine received", xbmc.LOGINFO)
+            set_service_status(STATUS_STARTING)
+            handle_startup_trigger()
+        clear_command_property()
+        return
+
+    if normalized in ("stop_engine", "stop"):
+        # Native stop/disconnect API is not wired yet; mark idle for UI flow.
+        log("Command stop_engine received; native stop is not implemented yet", xbmc.LOGWARNING)
+        notify(ADDON_NAME, "Stop requested; full native disconnect is pending")
+        set_service_status(STATUS_IDLE)
+        clear_command_property()
+        return
+
+    if normalized in ("shutdown_app", "shutdown", "power_off"):
+        log("Command shutdown_app received", xbmc.LOGINFO)
+        set_service_status(STATUS_SHUTTING_DOWN)
+        shutdown_result = trigger_native_shutdown()
+        if shutdown_result["ok"]:
+            log(
+                f"Native shutdown completed ({format_native_result(shutdown_result['code'], shutdown_result['detail'])})",
+                xbmc.LOGINFO,
+            )
+        else:
+            log(
+                f"Native shutdown failed ({format_native_result(shutdown_result['code'], shutdown_result['detail'])})",
+                xbmc.LOGERROR,
+            )
+        set_service_status(STATUS_IDLE)
+        clear_command_property()
+        return "exit"
+
+    log(f"Ignoring unknown command: {normalized}", xbmc.LOGWARNING)
+    clear_command_property()
 
 
 def run_service():
@@ -516,8 +636,12 @@ def run_service():
 
     log("NoLimitConnect addon service started (python bootstrap)")
     log("Waiting for run_now trigger")
+    if get_home_property(STATUS_PROPERTY) == "":
+        set_service_status(STATUS_IDLE)
+    clear_command_property()
 
     if get_bool_setting("run_now"):
+        set_service_status(STATUS_STARTING)
         handle_startup_trigger()
 
     previous_run_trigger = get_bool_setting("run_now")
@@ -526,8 +650,12 @@ def run_service():
         if monitor.waitForAbort(1):
             break
 
+        if handle_command(get_home_property(COMMAND_PROPERTY)) == "exit":
+            break
+
         current_run_trigger = get_bool_setting("run_now")
         if current_run_trigger and not previous_run_trigger:
+            set_service_status(STATUS_STARTING)
             handle_startup_trigger()
         previous_run_trigger = current_run_trigger
 
